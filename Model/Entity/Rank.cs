@@ -7,6 +7,4 @@ public class Rank
     public int TotalScore { get; set; }
     public int GamesPlayed { get; set; }
     public DateTime UpdatedAt { get; set; }
-    
-    public User User { get; set; }
 }

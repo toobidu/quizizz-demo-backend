@@ -6,6 +6,4 @@ public class User
     public string Username { get; set; }
     public string Password { get; set; }
     public string TypeAccount { get; set; }
-
-    public ICollection<UserRole> UserRoles { get; set; }
 }
