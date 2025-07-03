@@ -1,0 +1,23 @@
+﻿{
+  "AppSettings": {
+    "JwtKey": "FGWXAAiAklJ81xGRNbIY58sY2TsFVyvJIHmaXgge7ic+mD+hWhnPuk1R+tgRNP3KVF0m+lfjQJJyENiceaCJpg==",
+    "JwtIssuer": "quizizz-server",
+    "JwtAudience": "quizizz-client",
+    "AccessTokenExpirationMinutes": 45,
+    "RefreshTokenExpirationDays": 7
+  },
+  "Redis": {
+    "ConnectionString": "localhost:6379",
+    "Password": "demo",
+    "DatabaseId": 0
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5434;Database=quizizz;Username=demo;Password=demo"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
