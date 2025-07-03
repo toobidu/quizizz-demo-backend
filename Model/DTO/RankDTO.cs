@@ -2,14 +2,9 @@
 
 public class RankDTO
 {
+    public int UserId { get; set; }
     public string Username { get; set; }
-    public int Score { get; set; }
-    public string TimeTaken { get; set; }
-
-    public RankDTO(string username, int score, TimeSpan timeTaken)
-    {
-        Username = username;
-        Score = score;
-        TimeTaken = $"{timeTaken.TotalSeconds:F2}s";
-    }
+    public int TotalScore { get; set; }
+    public int GamesPlayed { get; set; }
+    public string UpdatedAt { get; set; }
 }

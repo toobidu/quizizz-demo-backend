@@ -2,5 +2,5 @@
 
 public class LeaderboardDTO
 {
-    
+    public List<RankDTO> TopPlayers { get; set; }
 }

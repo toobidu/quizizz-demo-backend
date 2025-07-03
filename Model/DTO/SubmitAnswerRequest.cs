@@ -3,16 +3,6 @@
 public class SubmitAnswerRequest
 {
     public int QuestionId { get; set; }
-    public string SelectedAnswer { get; set; }
-
-    public SubmitAnswerRequest(int questionId, string selectedAnswer)
-    {
-        QuestionId = questionId;
-        SelectedAnswer = selectedAnswer;
-    }
-
-    public bool ValidField()
-    {
-        return SelectedAnswer is "A" or "B" or "C" or "D";
-    }
+    public int AnswerId { get; set; }
+    public bool ValidField() => AnswerId > 0 && QuestionId > 0;
 }
