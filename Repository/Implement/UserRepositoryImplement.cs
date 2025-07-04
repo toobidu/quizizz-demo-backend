@@ -48,6 +48,13 @@ public class UserRepositoryImplement : IUserRepository
         await conn.ExecuteAsync(query, user);
     }
 
+    public async Task DeleteAsync(int id)
+    {
+        const string query = @"DELETE FROM ""User"" WHERE id = @id";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, id);
+    }
+
     public async Task<bool> ExistsByUsernameAsync(string username)
     {
         const string query = @"SELECT EXISTS (SELECT 1 FROM ""User"" WHERE username = @username)";
