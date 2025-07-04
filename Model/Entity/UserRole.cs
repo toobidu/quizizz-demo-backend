@@ -4,4 +4,7 @@ public class UserRole
 {
     public int UserId { get; set; }
     public int RoleId { get; set; }
+
+    public UserRole(int userId, int roleId) =>
+        (UserId, RoleId) = (userId, roleId);
 }
