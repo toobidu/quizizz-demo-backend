@@ -7,4 +7,7 @@ public class RankDTO
     public int TotalScore { get; set; }
     public int GamesPlayed { get; set; }
     public string UpdatedAt { get; set; }
+    
+    public RankDTO(int userId, string username, int totalScore, int gamesPlayed, string updatedAt) =>
+        (UserId, Username, TotalScore, GamesPlayed, UpdatedAt) = (userId, username, totalScore, gamesPlayed, updatedAt);
 }

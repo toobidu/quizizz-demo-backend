@@ -9,4 +9,6 @@ public class CreateRoomRequest
     {
         return !string.IsNullOrWhiteSpace(Name);
     }
+    public CreateRoomRequest(string name, bool isPrivate) =>
+        (Name, IsPrivate) = (name, isPrivate);   
 }

@@ -6,4 +6,7 @@ public class RoomSummaryDTO
     public string RoomName { get; set; }
     public bool IsPrivate { get; set; }
     public int PlayerCount { get; set; }
+    
+    public RoomSummaryDTO(string roomCode, string roomName, bool isPrivate, int playerCount) =>
+        (RoomCode, RoomName, IsPrivate, PlayerCount) = (roomCode, roomName, isPrivate, playerCount);
 }

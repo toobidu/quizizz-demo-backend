@@ -12,4 +12,7 @@ public class RegisterRequest
                !string.IsNullOrWhiteSpace(Password) &&
                !string.IsNullOrWhiteSpace(TypeAccount);
     }
+    
+    public RegisterRequest(string username, string password, string typeAccount) =>
+        (Username, Password, TypeAccount) = (username, password, typeAccount);
 }

@@ -10,4 +10,7 @@ public class LoginRequest
         return !string.IsNullOrWhiteSpace(Username) &&
                !string.IsNullOrWhiteSpace(Password);
     }
+    
+    public LoginRequest(string username, string password) =>
+        (Username, Password) = (username, password);    
 }

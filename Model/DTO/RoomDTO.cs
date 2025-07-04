@@ -6,4 +6,7 @@ public class RoomDTO
     public string Name { get; set; }
     public bool IsPrivate { get; set; }
     public int OwnerId{ get; set; }
+    
+    public RoomDTO(string code, string name, bool isPrivate, int ownerId) =>
+        (Code, Name, IsPrivate, OwnerId) = (code, name, isPrivate, ownerId);
 }

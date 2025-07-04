@@ -8,4 +8,7 @@ public class JoinRoomRequest
     {
         return !string.IsNullOrWhiteSpace(RoomCode);
     }
+    
+    public JoinRoomRequest(string roomCode) =>
+        RoomCode = roomCode;   
 }
