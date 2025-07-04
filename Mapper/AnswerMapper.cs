@@ -10,7 +10,7 @@ public static class AnswerMapper
         return new AnswerDTO(
             id: answer.Id,
             answerText: answer.AnswerText,
-            optionIndex: answer.IsCorrect ? 0 : -1 
+            optionIndex: 0
         );
     }
 
@@ -20,7 +20,7 @@ public static class AnswerMapper
             id: answerDto.Id,
             questionId: 0, 
             answerText: answerDto.AnswerText,
-            isCorrect: answerDto.OptionIndex == 0 
+            isCorrect: false
         );
     }
 }

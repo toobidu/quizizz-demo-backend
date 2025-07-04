@@ -19,7 +19,7 @@ public static class RankMapper
     public static Rank ToEntity(RankDTO rankDto)
     {
         return new Rank(
-            id: 0, 
+            id: 0,
             userId: rankDto.UserId,
             totalScore: rankDto.TotalScore,
             gamesPlayed: rankDto.GamesPlayed,

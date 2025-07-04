@@ -18,7 +18,7 @@ public static class RoomMapper
     public static Room ToEntity(RoomDTO roomDto)
     {
         return new Room(
-            id: 0, 
+            id: 0,
             roomCode: roomDto.Code,
             roomName: roomDto.Name,
             isPrivate: roomDto.IsPrivate,

@@ -5,15 +5,19 @@ namespace ConsoleApp1.Mapper;
 
 public static class RoleMapper
 {
-    public static RoleDTO ToDTO(this Role role) => new RoleDTO
+    public static RoleDTO ToDTO(Role role)
     {
-        Id = role.Id,
-        RoleName = role.RoleName
-    };
+        return new RoleDTO(
+            id: role.Id,
+            roleName: role.RoleName
+        );
+    }
 
-    public static Role ToEntity(this RoleDTO dto) => new Role
+    public static Role ToEntity(RoleDTO roleDto)
     {
-        Id = dto.Id,
-        RoleName = dto.RoleName
-    };
+        return new Role(
+            id: roleDto.Id,
+            roleName: roleDto.RoleName
+        );
+    }
 }

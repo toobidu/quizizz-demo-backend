@@ -5,15 +5,19 @@ namespace ConsoleApp1.Mapper;
 
 public static class PermissionMapper
 {
-    public static PermissionDTO ToDTO(this Permission permission) => new PermissionDTO
+    public static PermissionDTO ToDTO(Permission permission)
     {
-        Id = permission.Id,
-        PermissionName = permission.PermissionName
-    };
+        return new PermissionDTO(
+            id: permission.Id,
+            permissionName: permission.PermissionName
+        );
+    }
 
-    public static Permission ToEntity(this PermissionDTO dto) => new Permission
+    public static Permission ToEntity(PermissionDTO permissionDto)
     {
-        Id = dto.Id,
-        PermissionName = dto.PermissionName
-    };
+        return new Permission(
+            id: permissionDto.Id,
+            permissionName: permissionDto.PermissionName
+        );
+    }
 }

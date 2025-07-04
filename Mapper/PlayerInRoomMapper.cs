@@ -5,23 +5,23 @@ namespace ConsoleApp1.Mapper;
 
 public static class PlayerInRoomMapper
 {
-    public static PlayerInRoomDTO ToDTO(RoomPlayer roomPlayer, string username)
+    public static PlayerInRoomDTO ToDTO(RoomPlayer rp, string username)
     {
         return new PlayerInRoomDTO(
-            userId: roomPlayer.UserId,
+            userId: rp.UserId,
             username: username,
-            score: roomPlayer.Score,
-            timeTaken: roomPlayer.TimeTaken
+            score: rp.Score,
+            timeTaken: rp.TimeTaken
         );
     }
 
-    public static RoomPlayer ToEntity(PlayerInRoomDTO playerDto)
+    public static RoomPlayer ToEntity(PlayerInRoomDTO dto)
     {
         return new RoomPlayer(
-            roomId: 0, 
-            userId: playerDto.UserId,
-            score: playerDto.Score,
-            timeTaken: playerDto.TimeTaken
+            roomId: 0,
+            userId: dto.UserId,
+            score: dto.Score,
+            timeTaken: dto.TimeTaken
         );
     }
 }
