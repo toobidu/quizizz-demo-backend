@@ -1,12 +1,12 @@
 ﻿version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+#  app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
   postgres:
-    build: .
+    image: postgres:latest
     container_name: quizizz_db
     environment:
       POSTGRES_USER: demo
@@ -16,6 +16,7 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./data.sql:/docker-entrypoint-initdb.d/data.sql
 
   redis:
     image: redis:latest

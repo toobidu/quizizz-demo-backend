@@ -1,5 +1,5 @@
-﻿using System.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace ConsoleApp1.Data;
 
@@ -16,8 +16,8 @@ public static class DatabaseHelper
         return config.GetConnectionString("DefaultConnection");
     }
 
-    public static SqlConnection GetConnection()
+    public static NpgsqlConnection GetConnection()
     {
-        return new SqlConnection(GetConnectionString());
+        return new NpgsqlConnection(GetConnectionString());
     }
 }
