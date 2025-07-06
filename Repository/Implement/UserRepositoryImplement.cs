@@ -72,6 +72,7 @@ public class UserRepositoryImplement : IUserRepository
     {
         const string query = @"SELECT id, username, password, type_account FROM users";
         using var conn = CreateConnection();
-        return await conn.QueryAsync<User>(query);
+        var result = await conn.QueryAsync<User>(query);
+        return result.ToList();
     }
 }

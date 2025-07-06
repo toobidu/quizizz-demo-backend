@@ -24,14 +24,14 @@ public class RoleRepositoryImplement : IRoleRepository
     {
         const string query = @"SELECT * FROM roles WHERE id = @Id";
         using var conn = CreateConnection();
-        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { id });
+        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { Id = id });
     }
 
     public async Task<Role?> GetByRoleNameAsync(string roleName)
     {
         const string query = @"SELECT * FROM roles WHERE role_name = @RoleName";
         using var conn = CreateConnection();
-        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { roleName });
+        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { RoleName = roleName });
     }
 
     public async Task<int> AddAsync(Role role)
@@ -48,18 +48,19 @@ public class RoleRepositoryImplement : IRoleRepository
         await conn.ExecuteAsync(query, role);
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id)
     {
         const string query = @"DELETE FROM roles WHERE id = @Id";
         using var conn = CreateConnection();
-        await conn.ExecuteAsync(query, id);
+        var affectedRows = await conn.ExecuteAsync(query, new { Id = id });
+        return affectedRows > 0;
     }
 
     public async Task<bool> ExistsByRoleNameAsync(string roleName)
     {
         const string query = @"SELECT EXISTS (SELECT 1 FROM roles WHERE role_name = @RoleName)";
         using var conn = CreateConnection();
-        return await conn.ExecuteScalarAsync<bool>(query, new { roleName });
+        return await conn.ExecuteScalarAsync<bool>(query, new { RoleName = roleName });
     }
 
     public async Task<IEnumerable<Role>> GetAllAsync()
