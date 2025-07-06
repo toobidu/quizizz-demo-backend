@@ -1,6 +1,72 @@
-﻿namespace ConsoleApp1.Repository.Implement;
+﻿using System.Data;
+using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Repository.Interface;
+using Dapper;
+using Npgsql;
 
-public class RoleRepositoryImplement
+namespace ConsoleApp1.Repository.Implement;
+
+public class RoleRepositoryImplement : IRoleRepository
 {
-    
+    public readonly string ConnectionString;
+
+    public RoleRepositoryImplement(string connectionString)
+    {
+        ConnectionString = connectionString;
+    }
+
+    /*
+    Tạo Connection
+    */
+    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+
+    public async Task<Role?> GetByIdAsync(int id)
+    {
+        const string query = @"SELECT * FROM roles WHERE id = @Id";
+        using var conn = CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { id });
+    }
+
+    public async Task<Role?> GetByRoleNameAsync(string roleName)
+    {
+        const string query = @"SELECT * FROM roles WHERE role_name = @RoleName";
+        using var conn = CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { roleName });
+    }
+
+    public async Task<int> AddAsync(Role role)
+    {
+        const string query = @"INSERT INTO roles (role_name) VALUES (@RoleName) RETURNING id";
+        using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<int>(query, role);
+    }
+
+    public async Task UpdateAsync(Role role)
+    {
+        const string query = @"UPDATE roles SET role_name = @RoleName WHERE id = @Id";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, role);
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        const string query = @"DELETE FROM roles WHERE id = @Id";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, id);
+    }
+
+    public async Task<bool> ExistsByRoleNameAsync(string roleName)
+    {
+        const string query = @"SELECT EXISTS (SELECT 1 FROM roles WHERE role_name = @RoleName)";
+        using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<bool>(query, new { roleName });
+    }
+
+    public async Task<IEnumerable<Role>> GetAllAsync()
+    {
+        const string query = @"SELECT id, role_name FROM roles";
+        using var conn = CreateConnection();
+        var result = await conn.QueryAsync<Role>(query);
+        return result.ToList();
+    }
 }
