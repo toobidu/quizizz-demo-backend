@@ -16,8 +16,17 @@ public class RedisService : IRedisService
     {
         string key = $"permissions:{userId}";
         await db.KeyDeleteAsync(key);
-        await db.SetAddAsync(key, permissions.Select(p => (RedisValue)p).ToArray());
+
+        if (permissions != null && permissions.Any())
+        {
+            await db.SetAddAsync(key, permissions.Select(p => (RedisValue)p).ToArray());
+        }
+        else
+        {
+            Console.WriteLine($"[WARNING] Không có quyền nào để set vào Redis cho user {userId}");
+        }
     }
+
 
     public async Task AddPermissionAsync(int userId, string permission)
     {

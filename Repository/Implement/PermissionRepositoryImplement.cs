@@ -19,7 +19,7 @@ public class PermissionRepositoryImplement : IPermissionRepository
 
     public async Task<Permission?> GetByIdAsync(int id)
     {
-        const string query = @"SELECT id, permission_name FROM permissions WHERE id = @Id";
+        const string query = @"SELECT * FROM permissions WHERE id = @Id";
         using var conn = CreateConnection();
         return await conn.QuerySingleOrDefaultAsync<Permission>(query, new { Id = id });
     }
@@ -66,5 +66,26 @@ public class PermissionRepositoryImplement : IPermissionRepository
         const string query = @"SELECT EXISTS (SELECT 1 FROM permissions WHERE permission_name = @PermissionName)";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<bool>(query, new { PermissionName = permissionName });
+    }
+    public async Task<IEnumerable<string>> GetPermissionsByUserIdAsync(int userId)
+    {
+        const string query = @"
+        SELECT p.permission_name
+        FROM permissions p
+        INNER JOIN role_permissions rp ON p.id = rp.permission_id
+        INNER JOIN user_roles ur ON ur.role_id = rp.role_id
+        WHERE ur.user_id = @UserId
+    ";
+
+        using var conn = CreateConnection();
+        var result = await conn.QueryAsync<string>(query, new { UserId = userId });
+        return result.Distinct().ToList();
+    }
+
+    public async Task<IEnumerable<Permission>> GetByIdsAsync(IEnumerable<int> ids)
+    {
+        const string query = @"SELECT id AS Id, permission_name AS PermissionName FROM permissions WHERE id = ANY(@Ids)";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<Permission>(query, new { Ids = ids });
     }
 }

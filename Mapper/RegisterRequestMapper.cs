@@ -8,7 +8,6 @@ public static class RegisterRequestMapper
     public static User ToEntity(RegisterRequest request)
     {
         return new User(
-            id: 0,
             username: request.Username,
             password: request.Password,
             typeAccount: request.TypeAccount

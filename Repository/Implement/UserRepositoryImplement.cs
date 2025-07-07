@@ -68,10 +68,28 @@ public class UserRepositoryImplement : IUserRepository
 
     public async Task<bool> DeleteAsync(int id)
     {
-        const string query = @"DELETE FROM users WHERE id = @Id";
         using var conn = CreateConnection();
-        var affectedRows = await conn.ExecuteAsync(query, new { Id = id });
-        return affectedRows > 0;
+        var npgsqlConn = (NpgsqlConnection)conn;
+        await npgsqlConn.OpenAsync();
+        using var transaction = npgsqlConn.BeginTransaction();
+        try
+        {
+            // Delete user_roles first
+            const string deleteUserRoles = @"DELETE FROM user_roles WHERE user_id = @Id";
+            await conn.ExecuteAsync(deleteUserRoles, new { Id = id }, transaction);
+
+            // Then delete the user
+            const string deleteUser = @"DELETE FROM users WHERE id = @Id";
+            var affectedRows = await conn.ExecuteAsync(deleteUser, new { Id = id }, transaction);
+
+            await transaction.CommitAsync();
+            return affectedRows > 0;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<bool> ExistsByUsernameAsync(string username)

@@ -8,7 +8,6 @@ public static class LoginRequestMapper
     public static User ToEntity(LoginRequest request)
     {
         return new User(
-            id: 0,
             username: request.Username,
             password: request.Password,
             typeAccount: "default"

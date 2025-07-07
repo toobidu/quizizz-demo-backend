@@ -29,9 +29,16 @@ public class RoleRepositoryImplement : IRoleRepository
 
     public async Task<Role?> GetByRoleNameAsync(string roleName)
     {
-        const string query = @"SELECT * FROM roles WHERE role_name = @RoleName";
+        const string query = @"
+            SELECT 
+                id AS Id,
+                role_name AS RoleName
+            FROM roles 
+            WHERE UPPER(role_name) = UPPER(@RoleName)";
         using var conn = CreateConnection();
-        return await conn.QuerySingleOrDefaultAsync<Role>(query, new { RoleName = roleName });
+        var role = await conn.QuerySingleOrDefaultAsync<Role>(query, new { RoleName = roleName });
+        Console.WriteLine($"Role query result for {roleName}: {role?.RoleName ?? "null"}");
+        return role;
     }
 
     public async Task<int> AddAsync(Role role)
@@ -65,7 +72,7 @@ public class RoleRepositoryImplement : IRoleRepository
 
     public async Task<IEnumerable<Role>> GetAllAsync()
     {
-        const string query = @"SELECT id, role_name FROM roles";
+        const string query = @"SELECT id AS Id, role_name AS RoleName FROM roles";
         using var conn = CreateConnection();
         var result = await conn.QueryAsync<Role>(query);
         return result.ToList();

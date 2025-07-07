@@ -11,4 +11,6 @@ public interface IPermissionRepository
     Task<bool> DeleteAsync(int id);
     Task<bool> ExistsByPermissionNameAsync(string permissionName);
     Task<IEnumerable<Permission>> GetAllAsync();
+    Task<IEnumerable<string>> GetPermissionsByUserIdAsync(int userId);
+    Task<IEnumerable<Permission>> GetByIdsAsync(IEnumerable<int> ids);
 }

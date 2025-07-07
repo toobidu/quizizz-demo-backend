@@ -18,7 +18,6 @@ public static class UserMapper
     public static User ToEntity(UserDTO userDto)
     {
         return new User(
-            id: userDto.Id,
             username: userDto.Username,
             password: userDto.Password,
             typeAccount: userDto.TypeAccount

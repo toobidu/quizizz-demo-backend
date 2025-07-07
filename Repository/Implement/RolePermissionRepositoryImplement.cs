@@ -19,7 +19,11 @@ public class RolePermissionRepositoryImplement : IRolePermissionRepository
 
     public async Task<RolePermission?> GetByRoleIdAndPermissionIdAsync(int roleId, int permissionId)
     {
-        const string query = @"SELECT * FROM role_permissions WHERE role_id = @RoleId AND permission_id = @PermissionId";
+        const string query = @"
+            SELECT role_id AS RoleId, permission_id AS PermissionId
+            FROM role_permissions
+            WHERE role_id = @RoleId AND permission_id = @PermissionId";
+        
         using var conn = CreateConnection();
         return await conn.QuerySingleOrDefaultAsync<RolePermission>(
             query,
@@ -29,7 +33,11 @@ public class RolePermissionRepositoryImplement : IRolePermissionRepository
 
     public async Task<IEnumerable<RolePermission>> GetByRoleIdAsync(int roleId)
     {
-        const string query = @"SELECT * FROM role_permissions WHERE role_id = @RoleId";
+        const string query = @"
+            SELECT role_id AS RoleId, permission_id AS PermissionId
+            FROM role_permissions
+            WHERE role_id = @RoleId";
+
         using var conn = CreateConnection();
         var result = await conn.QueryAsync<RolePermission>(query, new { RoleId = roleId });
         return result.ToList();
@@ -37,7 +45,11 @@ public class RolePermissionRepositoryImplement : IRolePermissionRepository
 
     public async Task<IEnumerable<RolePermission>> GetByPermissionIdAsync(int permissionId)
     {
-        const string query = @"SELECT * FROM role_permissions WHERE permission_id = @PermissionId";
+        const string query = @"
+            SELECT role_id AS RoleId, permission_id AS PermissionId
+            FROM role_permissions
+            WHERE permission_id = @PermissionId";
+
         using var conn = CreateConnection();
         var result = await conn.QueryAsync<RolePermission>(query, new { PermissionId = permissionId });
         return result.ToList();
@@ -45,7 +57,11 @@ public class RolePermissionRepositoryImplement : IRolePermissionRepository
 
     public async Task<int> AddAsync(RolePermission rolePermission)
     {
-        const string query = @"INSERT INTO role_permissions (role_id, permission_id) VALUES (@RoleId, @PermissionId) RETURNING id";
+        const string query = @"
+            INSERT INTO role_permissions (role_id, permission_id)
+            VALUES (@RoleId, @PermissionId)
+            RETURNING role_id"; // hoặc RETURNING permission_id nếu bạn muốn lấy cái nào
+
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, rolePermission);
     }

@@ -9,13 +9,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Hub\" />
-      <Folder Include="Properties\" />
-      <Folder Include="Service\Implement\" />
-      <Folder Include="Service\Interface\" />
-    </ItemGroup>
-
-    <ItemGroup>
         <!-- Socket.IO -->
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.6" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.6" />

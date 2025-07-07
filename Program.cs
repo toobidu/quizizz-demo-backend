@@ -1,40 +1,61 @@
-﻿using System.Net;
-using System.Net.Sockets;
-using System.Text;
+﻿using System.Text;
+using ConsoleApp1.Config;
+using ConsoleApp1.Controller;
+using ConsoleApp1.Repository.Implement;
+using ConsoleApp1.Router;
+using ConsoleApp1.Security;
+using ConsoleApp1.Service.Implement;
+using ConsoleApp1.Service.Interface;
 
-class Program
+internal class Program
 {
-    static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
-        const int port = 8080;
-        var listener = new TcpListener(IPAddress.Any, port);
-        listener.Start();
-        Console.WriteLine($"Server is listening on http://localhost:{port}");
+        Console.OutputEncoding = Encoding.UTF8;
 
-        while (true)
-        {
-            using var client = listener.AcceptTcpClient();
-            using var stream = client.GetStream();
+        // Load cấu hình
+        var config = ConfigLoader.Load();
 
-            // Đọc request
-            byte[] buffer = new byte[1024];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            Console.WriteLine("Request:");
-            Console.WriteLine(requestText);
+        // Khởi tạo Redis và JWT
+        var redisConn = new RedisConnection(config.Redis);
+        var redisService = new RedisService(redisConn);
+        var jwtHelper = new JwtHelper(config.Security);
 
-            // Chuẩn bị response
-            string responseBody = "hello";
-            string response =
-                "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/plain\r\n" +
-                $"Content-Length: {responseBody.Length}\r\n" +
-                "\r\n" +
-                responseBody;
+        // Khởi tạo Repository
+        string dbConnection = config.ConnectionStrings["DefaultConnection"];
+        var userRepo = new UserRepositoryImplement(dbConnection);
+        var roleRepo = new RoleRepositoryImplement(dbConnection);
+        var userRoleRepo = new UserRoleRepositoryImplement(dbConnection);
+        var rolePermissionRepo = new RolePermissionRepositoryImplement(dbConnection);
+        var permissionRepo = new PermissionRepositoryImplement(dbConnection);
 
-            // Gửi response
-            byte[] responseBytes = Encoding.UTF8.GetBytes(response);
-            stream.Write(responseBytes, 0, responseBytes.Length);
-        }
+        // Khởi tạo Service
+        IAuthService authService = new AuthService(
+            userRepo, rolePermissionRepo, permissionRepo, roleRepo, userRoleRepo, redisService, jwtHelper, config.Security
+        );
+
+        IRolePermissionService rolePermissionService = new RolePermissionService(
+            rolePermissionRepo, permissionRepo, roleRepo, userRoleRepo, userRepo, redisService
+        );
+
+        // Khởi tạo AuthorizationService
+        IAuthorizationService authorizationService = new AuthorizationService(redisService, permissionRepo);
+
+        // Khởi tạo Controller
+        var authController = new AuthController(authService, jwtHelper);
+        var rolePermissionController = new RolePermissionController(
+            rolePermissionService,
+            authorizationService,
+            jwtHelper
+        );
+
+        // Khởi tạo và chạy HttpServer
+        var server = new HttpServer(
+            "http://localhost:5000/",
+            new AuthRouter(authController),
+            new RolePermissionRouter(rolePermissionController)
+        );
+
+        await server.StartAsync();
     }
 }
