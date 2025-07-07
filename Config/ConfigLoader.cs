@@ -9,12 +9,11 @@ public class ConfigLoader
         var json = File.ReadAllText("appsettings.json");
         var root = JsonDocument.Parse(json).RootElement;
 
-        var appSettings = root.GetProperty("AppSettings");
-
-        var config = new ManageConfig()
+        var config = new ManageConfig
         {
-            Security = JsonSerializer.Deserialize<SecurityConfig>(appSettings.GetRawText())!,
-            Redis = JsonSerializer.Deserialize<RedisConfig>(root.GetProperty("Redis").GetRawText())!
+            Security = JsonSerializer.Deserialize<SecurityConfig>(root.GetProperty("AppSettings").GetRawText())!,
+            Redis = JsonSerializer.Deserialize<RedisConfig>(root.GetProperty("Redis").GetRawText())!,
+            ConnectionStrings = JsonSerializer.Deserialize<Dictionary<string, string>>(root.GetProperty("ConnectionStrings").GetRawText())!
         };
 
         return config;

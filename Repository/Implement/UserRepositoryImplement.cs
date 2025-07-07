@@ -26,9 +26,22 @@ public class UserRepositoryImplement : IUserRepository
 
     public async Task<User?> GetByUsernameAsync(string username)
     {
-        const string query = @"SELECT * FROM users WHERE username = @Username";
+        const string query = @"
+        SELECT 
+            id AS Id,
+            username AS Username,
+            password AS Password,
+            type_account AS TypeAccount
+        FROM users 
+        WHERE username = @Username";
         using var conn = CreateConnection();
-        return await conn.QuerySingleOrDefaultAsync<User>(query, new { Username = username });
+        var user = await conn.QuerySingleOrDefaultAsync<User>(query, new { Username = username });
+        Console.WriteLine($"Database query result for username {username}: {user != null}");
+        if (user != null)
+        {
+            Console.WriteLine($"User details - Id: {user.Id}, Username: {user.Username}, TypeAccount: {user.TypeAccount}");
+        }
+        return user;
     }
 
     public async Task<int> AddAsync(User user)

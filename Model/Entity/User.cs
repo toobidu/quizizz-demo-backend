@@ -7,6 +7,8 @@ public class User
     public string Password { get; set; }
     public string TypeAccount { get; set; }
     
-    public User(int id, string username, string password, string typeAccount) =>
-        (Id, Username, Password, TypeAccount) = (id, username, password, typeAccount);
+    public User( string username, string password, string typeAccount) =>
+        (Username, Password, TypeAccount) = (username, password, typeAccount);
+    
+    public User(){}
 }

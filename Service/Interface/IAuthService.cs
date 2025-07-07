@@ -1,6 +1,10 @@
-﻿namespace ConsoleApp1.Service.Interface;
+﻿using ConsoleApp1.Model.DTO;
 
-public class IAuthService
+namespace ConsoleApp1.Service.Interface;
+
+public interface IAuthService
 {
-    
+    Task<LoginResponse?> LoginAsync(LoginRequest request);
+    Task<bool> RegisterAsync(RegisterRequest request);
+    Task<bool> LogoutAsync(string accessToken);
 }

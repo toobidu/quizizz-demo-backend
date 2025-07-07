@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using ConsoleApp1.Config;
 using Microsoft.IdentityModel.Tokens;
 
@@ -10,11 +11,11 @@ public class JwtHelper
 {
     private readonly SecurityConfig config;
     private readonly byte[] key;
-    
+
     public JwtHelper(SecurityConfig config)
     {
         this.config = config;
-        key = Convert.FromBase64String(config.JwtKey);
+        key = Encoding.UTF8.GetBytes(config.JwtKey);
     }
 
     /// <summary>
@@ -24,18 +25,19 @@ public class JwtHelper
     /// <param name="username">Tên đăng nhập.</param>
     /// <param name="typeAccount">Loại tài khoản (Admin/Player).</param>
     /// <returns>Chuỗi JWT hợp lệ.</returns>
-    public string GenerateAccessToken(int userId, string username, string typeAccount, SecurityConfig config)
+    public string GenerateAccessToken(int userId, string username, string typeAccount)
     {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var securityKey = new SymmetricSecurityKey(key);
+        if (string.IsNullOrEmpty(config.JwtKey))
+            throw new ArgumentException("SecretKey is not configured");
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config.JwtKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new Claim(JwtRegisteredClaimNames.UniqueName, username),
-            new Claim("typeAccount", typeAccount),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim("userId", userId.ToString()),
+            new Claim("username", username),
+            new Claim("typeAccount", typeAccount)
         };
 
         var token = new JwtSecurityToken(
@@ -43,10 +45,9 @@ public class JwtHelper
             audience: config.JwtAudience,
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(config.AccessTokenExpirationMinutes),
-            signingCredentials: credentials
-        );
+            signingCredentials: credentials);
 
-        return tokenHandler.WriteToken(token);
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     public string GenerateRefreshToken()
@@ -87,14 +88,14 @@ public class JwtHelper
     public int? GetUserIdFromToken(string token)
     {
         var principal = ValidateToken(token, out _);
-        var userIdClaim = principal?.FindFirst(JwtRegisteredClaimNames.Sub);
+        var userIdClaim = principal?.FindFirst("userId");
         return userIdClaim != null && int.TryParse(userIdClaim.Value, out int id) ? id : null;
     }
 
     public string? GetUsernameFromToken(string token)
     {
         var principal = ValidateToken(token, out _);
-        return principal?.FindFirst(JwtRegisteredClaimNames.UniqueName)?.Value;
+        return principal?.FindFirst("username")?.Value;
     }
 
     public string? GetTypeAccountFromToken(string token)
