@@ -6,9 +6,11 @@ public class User
     public string Username { get; set; }
     public string Password { get; set; }
     public string TypeAccount { get; set; }
-    
-    public User( string username, string password, string typeAccount) =>
+
+    public User(string username, string password, string typeAccount) =>
         (Username, Password, TypeAccount) = (username, password, typeAccount);
-    
-    public User(){}
+
+    public User()
+    {
+    }
 }

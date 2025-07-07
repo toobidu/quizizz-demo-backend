@@ -7,6 +7,10 @@ public class Answer
     public string AnswerText { get; set; } = string.Empty;
     public bool IsCorrect { get; set; }
 
+    public Answer()
+    {
+    }
+
     public Answer(int id, int questionId, string answerText, bool isCorrect) =>
         (Id, QuestionId, AnswerText, IsCorrect) = (id, questionId, answerText, isCorrect);
 }
