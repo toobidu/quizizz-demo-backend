@@ -20,11 +20,19 @@ public class AuthController
     */
     public async Task<string> RegisterApi(RegisterRequest request)
     {
-        if (!request.ValidField())
-            return "Dữ liệu không hợp lệ";
+        try 
+        {
+            if (!request.ValidField())
+                return "Dữ liệu không hợp lệ";
 
-        bool success = await _authService.RegisterAsync(request);
-        return success ? "Đăng ký thành công" : "Tên người dùng đã tồn tại";
+            bool success = await _authService.RegisterAsync(request);
+            return success ? "Đăng ký thành công" : "Đăng ký thất bại";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Registration error: {ex.Message}");
+            return "Đăng ký thất bại: " + ex.Message;
+        }
     }
 
     /*

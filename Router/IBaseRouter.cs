@@ -1,6 +1,9 @@
-﻿namespace ConsoleApp1.Router;
+﻿using System.Net;
 
-public class IBaseRouter
+namespace ConsoleApp1.Router;
+
+public interface IBaseRouter
 {
-    
+    Task<bool> HandleAsync(HttpListenerRequest request, HttpListenerResponse response);
+
 }
