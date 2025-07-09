@@ -1,4 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO;
+﻿namespace ConsoleApp1.Model.DTO.Users;
 
 public class RolePermissionDTO
 {

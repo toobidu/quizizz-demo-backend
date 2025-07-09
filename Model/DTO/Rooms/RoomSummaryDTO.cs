@@ -1,4 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO;
+﻿namespace ConsoleApp1.Model.DTO.Rooms;
 
 public class RoomSummaryDTO
 {
@@ -6,7 +6,9 @@ public class RoomSummaryDTO
     public string RoomName { get; set; }
     public bool IsPrivate { get; set; }
     public int PlayerCount { get; set; }
+    public string Status { get; set; }
     
-    public RoomSummaryDTO(string roomCode, string roomName, bool isPrivate, int playerCount) =>
-        (RoomCode, RoomName, IsPrivate, PlayerCount) = (roomCode, roomName, isPrivate, playerCount);
+    public RoomSummaryDTO(string roomCode, string roomName, bool isPrivate, int playerCount, string status) =>
+        (RoomCode, RoomName, IsPrivate, PlayerCount, Status) = 
+        (roomCode, roomName, isPrivate, playerCount, status);
 }
