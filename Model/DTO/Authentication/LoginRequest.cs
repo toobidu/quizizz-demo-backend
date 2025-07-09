@@ -4,6 +4,11 @@ namespace ConsoleApp1.Model.DTO;
 
 public class LoginRequest
 {
+    [JsonPropertyName("username")]
+    public string Username { get; set; }
+
+    [JsonPropertyName("password")]
+    public string Password { get; set; }
     public LoginRequest() { }
 
     public LoginRequest(string username, string password)
@@ -11,13 +16,7 @@ public class LoginRequest
         Username = username;
         Password = password;
     }
-
-    [JsonPropertyName("username")]
-    public string Username { get; set; }
-
-    [JsonPropertyName("password")]
-    public string Password { get; set; }
-
+    
     public bool ValidField()
     {
         return !string.IsNullOrWhiteSpace(Username) &&

@@ -1,4 +1,4 @@
-﻿namespace ConsoleApp1.Model.Entity;
+﻿namespace ConsoleApp1.Model.Entity.Users;
 
 public class UserAnswer
 {

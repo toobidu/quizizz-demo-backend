@@ -1,4 +1,4 @@
-﻿namespace ConsoleApp1.Model.Entity;
+﻿namespace ConsoleApp1.Model.Entity.Questions;
 
 public class Topic
 {
