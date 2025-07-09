@@ -8,12 +8,21 @@ public class UserAnswer
     public int AnswerId { get; set; }
     public bool IsCorrect { get; set; }
     public TimeSpan TimeTaken { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
-    public UserAnswer()
+    public UserAnswer() { }
+
+    public UserAnswer(int userId, int roomId, int questionId, int answerId, 
+                     bool isCorrect, TimeSpan timeTaken, DateTime createdAt, DateTime updatedAt)
     {
+        UserId = userId;
+        RoomId = roomId;
+        QuestionId = questionId;
+        AnswerId = answerId;
+        IsCorrect = isCorrect;
+        TimeTaken = timeTaken;
+        CreatedAt = createdAt;
+        UpdatedAt = updatedAt;
     }
-
-    public UserAnswer(int userId, int roomId, int questionId, int answerId, bool isCorrect, TimeSpan timeTaken) =>
-        (UserId, RoomId, QuestionId, AnswerId, IsCorrect, TimeTaken) =
-        (userId, roomId, questionId, answerId, isCorrect, timeTaken);
 }

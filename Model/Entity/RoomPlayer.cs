@@ -6,11 +6,19 @@ public class RoomPlayer
     public int UserId { get; set; }
     public int Score { get; set; }
     public TimeSpan TimeTaken { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
-    public RoomPlayer()
+    public RoomPlayer() { }
+
+    public RoomPlayer(int roomId, int userId, int score, TimeSpan timeTaken, 
+                     DateTime createdAt, DateTime updatedAt)
     {
+        RoomId = roomId;
+        UserId = userId;
+        Score = score;
+        TimeTaken = timeTaken;
+        CreatedAt = createdAt;
+        UpdatedAt = updatedAt;
     }
-
-    public RoomPlayer(int roomId, int userId, int score, TimeSpan timeTaken) =>
-        (RoomId, UserId, Score, TimeTaken) = (roomId, userId, score, timeTaken);
 }
