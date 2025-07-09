@@ -1,4 +1,4 @@
-﻿using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.Entity.Rooms;
 
 namespace ConsoleApp1.Repository.Interface;
 
@@ -9,4 +9,5 @@ public interface IRoomPlayerRepository
     Task<int> AddAsync(RoomPlayer roomPlayer);
     Task UpdateAsync(RoomPlayer roomPlayer);
     Task<bool> DeleteByUserIdAndRoomIdAsync(int userId, int roomId);
+    Task UpdateTimeAndScoreAsync(int roomId, int userId, TimeSpan timeTaken, int score);
 }

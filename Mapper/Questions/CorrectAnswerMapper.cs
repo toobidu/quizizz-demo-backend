@@ -3,7 +3,7 @@ using ConsoleApp1.Model.Entity;
 
 namespace ConsoleApp1.Mapper;
 
-public class CorrectAnswerMapper
+public static class CorrectAnswerMapper
 {
     public static CorrectAnswerDTO ToDTO(int questionId, Answer answer)
     {

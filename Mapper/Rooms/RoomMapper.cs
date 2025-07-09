@@ -11,7 +11,8 @@ public static class RoomMapper
             code: room.RoomCode,
             name: room.RoomName,
             isPrivate: room.IsPrivate,
-            ownerId: room.OwnerId
+            ownerId: room.OwnerId,
+            maxPlayers: room.MaxPlayers
         );
     }
 
@@ -22,7 +23,8 @@ public static class RoomMapper
             roomCode: roomDto.Code,
             roomName: roomDto.Name,
             isPrivate: roomDto.IsPrivate,
-            ownerId: roomDto.OwnerId
+            ownerId: roomDto.OwnerId,
+            maxPlayers: roomDto.MaxPlayers
         );
     }
 

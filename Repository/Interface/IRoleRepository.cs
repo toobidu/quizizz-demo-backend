@@ -1,4 +1,4 @@
-﻿using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.Entity.Users;
 
 namespace ConsoleApp1.Repository.Interface;
 

@@ -1,14 +1,14 @@
 ﻿namespace ConsoleApp1.Model.Entity.Rooms;
 
-public class RoomSettings
+public class RoomSetting
 {
     public int RoomId { get; set; }
     public string SettingKey { get; set; }
     public string SettingValue { get; set; }
 
-    public RoomSettings() { }
+    public RoomSetting() { }
 
-    public RoomSettings(int roomId, string settingKey, string settingValue)
+    public RoomSetting(int roomId, string settingKey, string settingValue)
     {
         RoomId = roomId;
         SettingKey = settingKey;

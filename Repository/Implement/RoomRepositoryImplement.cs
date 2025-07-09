@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
 using Npgsql;
@@ -62,5 +63,39 @@ public class RoomRepositoryImplement : IRoomRepository
         using var conn = CreateConnection();
         var result = await conn.QueryAsync<Room>(query);
         return result.ToList();
+    }
+
+    public async Task<Room> UpdateStatusAsync(int roomId, string status)
+    {
+        const string query = @"UPDATE rooms 
+            SET status = @Status, updated_at = @UpdatedAt 
+            WHERE id = @Id
+            RETURNING *";
+        using var conn = CreateConnection();
+        return await conn.QuerySingleAsync<Room>(query, 
+            new { Id = roomId, Status = status, UpdatedAt = DateTime.UtcNow });
+    }
+
+    public async Task<IEnumerable<Room>> GetActiveRoomsAsync()
+    {
+        const string query = @"SELECT * FROM rooms WHERE status = 'ACTIVE'";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<Room>(query);
+    }
+
+    public async Task<int> GetPlayerCountAsync(int roomId)
+    {
+        const string query = @"SELECT COUNT(*) FROM room_players WHERE room_id = @RoomId";
+        using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<int>(query, new { RoomId = roomId });
+    }
+    public async Task UpdateMaxPlayersAsync(int roomId, int maxPlayers)
+    {
+        const string query = @"
+        UPDATE rooms 
+        SET max_players = @MaxPlayers
+        WHERE id = @Id";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, new { Id = roomId, MaxPlayers = maxPlayers });
     }
 }

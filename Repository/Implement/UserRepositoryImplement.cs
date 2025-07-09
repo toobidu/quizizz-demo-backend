@@ -1,5 +1,5 @@
 ﻿using System.Data;
-using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
 using Npgsql;
@@ -47,9 +47,9 @@ public class UserRepositoryImplement : IUserRepository
     public async Task<int> AddAsync(User user)
     {
         const string query = @"
-            INSERT INTO users (username, password, type_account)
-            VALUES (@Username, @Password, @TypeAccount)
-            RETURNING id";
+        INSERT INTO users (username, full_name, email, phone_number, address, password, type_account)
+        VALUES (@Username, @FullName, @Email, @Phone, @Address, @Password, @TypeAccount)
+        RETURNING id";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, user);
     }
@@ -57,11 +57,15 @@ public class UserRepositoryImplement : IUserRepository
     public async Task UpdateAsync(User user)
     {
         const string query = @"
-            UPDATE users
-            SET username = @Username,
-                password = @Password,
-                type_account = @TypeAccount
-            WHERE id = @Id";
+        UPDATE users
+        SET username = @Username,
+            full_name = @FullName,
+            email = @Email,
+            phone_number = @Phone,
+            address = @Address,
+            password = @Password,
+            type_account = @TypeAccount
+        WHERE id = @Id";
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, user);
     }

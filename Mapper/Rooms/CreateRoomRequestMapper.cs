@@ -12,7 +12,8 @@ public static class CreateRoomRequestMapper
             roomCode: Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper(),
             roomName: request.Name,
             isPrivate: request.IsPrivate,
-            ownerId: ownerId
+            ownerId: ownerId,
+            maxPlayers: request.MaxPlayers
         );
     }
 }

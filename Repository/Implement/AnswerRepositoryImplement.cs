@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity.Questions;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
 using Npgsql;

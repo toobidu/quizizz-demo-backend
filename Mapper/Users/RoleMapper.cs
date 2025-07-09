@@ -1,5 +1,5 @@
 ﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.DTO.Users;
 
 namespace ConsoleApp1.Mapper;
 
@@ -9,7 +9,8 @@ public static class RoleMapper
     {
         return new RoleDTO(
             id: role.Id,
-            roleName: role.RoleName
+            roleName: role.RoleName,
+            description: role.Description
         );
     }
 
@@ -17,7 +18,8 @@ public static class RoleMapper
     {
         return new Role(
             id: roleDto.Id,
-            roleName: roleDto.RoleName
+            roleName: roleDto.RoleName,
+            description: roleDto.Description
         );
     }
 }

@@ -1,4 +1,4 @@
-﻿using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.Entity.Rooms;
 
 namespace ConsoleApp1.Repository.Interface;
 
@@ -10,4 +10,8 @@ public interface IRoomRepository
     Task UpdateAsync(Room room);
     Task<bool> DeleteAsync(int id);
     Task<IEnumerable<Room>> GetAllAsync();
+    Task<Room> UpdateStatusAsync(int roomId, string status);
+    Task<IEnumerable<Room>> GetActiveRoomsAsync();
+    Task<int> GetPlayerCountAsync(int roomId);
+    Task UpdateMaxPlayersAsync(int roomId, int maxPlayers);
 }

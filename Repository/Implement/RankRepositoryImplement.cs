@@ -1,5 +1,5 @@
 ﻿using System.Data;
-using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity.Questions;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
 using Npgsql;
@@ -68,4 +68,27 @@ public class RankRepositoryImplement : IRankRepository
         var result = await conn.QueryAsync<Rank>(query);
         return result.ToList();
     }
+    
+    public async Task<IEnumerable<Rank>> GetTopPlayersAsync(int limit)
+    {
+        const string query = @"
+            SELECT * FROM ranks 
+            ORDER BY total_score DESC 
+            LIMIT @Limit";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<Rank>(query, new { Limit = limit });
+    }
+    
+    public async Task<(int TotalGames, double AverageScore)> GetUserStatsAsync(int userId)
+    {
+        const string query = @"
+        SELECT games_played as TotalGames,
+               CAST(total_score AS FLOAT) / NULLIF(games_played, 0) as AverageScore
+        FROM ranks
+        WHERE user_id = @UserId";
+        using var conn = CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<(int TotalGames, double AverageScore)>(
+            query, new { UserId = userId });
+    }
+
 }

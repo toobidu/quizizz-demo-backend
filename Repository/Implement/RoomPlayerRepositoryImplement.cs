@@ -1,5 +1,5 @@
 ﻿using System.Data;
-using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
 using Npgsql;
@@ -58,5 +58,18 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
         using var conn = CreateConnection();
         var affected = await conn.ExecuteAsync(query, new { UserId = userId, RoomId = roomId });
         return affected > 0;
+    }
+    
+    public async Task UpdateTimeAndScoreAsync(int roomId, int userId, TimeSpan timeTaken, int score)
+    {
+        const string query = @"
+        UPDATE room_players 
+        SET time_taken = @TimeTaken, 
+            score = @Score
+        WHERE room_id = @RoomId 
+        AND user_id = @UserId";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, 
+            new { RoomId = roomId, UserId = userId, TimeTaken = timeTaken, Score = score });
     }
 }
