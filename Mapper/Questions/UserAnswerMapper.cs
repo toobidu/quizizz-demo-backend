@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.Entity.Users;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Questions;
 
 public static class UserAnswerMapper
 {
@@ -24,7 +24,9 @@ public static class UserAnswerMapper
             questionId: dto.QuestionId,
             answerId: dto.SelectedAnswerId,
             isCorrect: dto.IsCorrect,
-            timeTaken: dto.TimeTaken
+            timeTaken: dto.TimeTaken,
+            createdAt: DateTime.UtcNow, // Default value
+            updatedAt: DateTime.UtcNow
         );
     }
 }

@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Users;
+using ConsoleApp1.Model.Entity.Users;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Users;
 
 public static class UserRoleMapper
 {
@@ -17,7 +17,9 @@ public static class UserRoleMapper
     {
         return new UserRole(
             userId: urDto.UserId,
-            roleId: urDto.RoleId
+            roleId: urDto.RoleId,
+            createdAt: DateTime.UtcNow,
+            updatedAt: DateTime.UtcNow
         );
     }
 }

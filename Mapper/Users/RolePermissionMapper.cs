@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Users;
+using ConsoleApp1.Model.Entity.Users;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Users;
 
 public static class RolePermissionMapper
 {
@@ -17,7 +17,9 @@ public static class RolePermissionMapper
     {
         return new RolePermission(
             roleId: rpDto.RoleId,
-            permissionId: rpDto.PermissionId
+            permissionId: rpDto.PermissionId,
+            createdAt: DateTime.UtcNow,
+            updatedAt: DateTime.UtcNow
         );
     }
 }

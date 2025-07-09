@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.Entity.Questions;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Questions;
 
 public static class AnswerMapper
 {
@@ -18,9 +18,11 @@ public static class AnswerMapper
     {
         return new Answer(
             id: answerDto.Id,
-            questionId: 0, 
+            questionId: 0,
             answerText: answerDto.AnswerText,
-            isCorrect: false
+            isCorrect: false,
+            createdAt: DateTime.UtcNow, 
+            updatedAt: DateTime.UtcNow  
         );
     }
 }

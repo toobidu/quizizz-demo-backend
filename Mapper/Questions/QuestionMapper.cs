@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.Entity.Questions;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Questions;
 
 public static class QuestionMapper
 {
@@ -10,7 +10,11 @@ public static class QuestionMapper
         return new QuestionDTO(
             id: question.Id,
             questionText: question.QuestionText,
-            options: options
+            options: options,
+            topicId: question.TopicId ?? 0,
+            questionTypeId: question.QuestionTypeId ?? 0,
+            timeLimit: 30, // Default time limit
+            points: 100 // Default points
         );
     }
 
@@ -18,7 +22,11 @@ public static class QuestionMapper
     {
         return new Question(
             id: questionDto.Id,
-            questionText: questionDto.QuestionText
+            questionText: questionDto.QuestionText,
+            topicId: questionDto.TopicId,
+            questionTypeId: questionDto.QuestionTypeId,
+            createdAt: DateTime.UtcNow,
+            updatedAt: DateTime.UtcNow
         );
     }
 }

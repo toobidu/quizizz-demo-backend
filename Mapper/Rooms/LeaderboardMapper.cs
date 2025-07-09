@@ -1,6 +1,6 @@
-﻿using ConsoleApp1.Model.DTO;
+﻿using ConsoleApp1.Model.DTO.Rooms;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Rooms;
 
 public static class LeaderboardMapper
 {

@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.Entity.Rooms;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Rooms;
 
 public static class RoomMapper
 {
@@ -12,7 +12,8 @@ public static class RoomMapper
             name: room.RoomName,
             isPrivate: room.IsPrivate,
             ownerId: room.OwnerId,
-            maxPlayers: room.MaxPlayers
+            maxPlayers: room.MaxPlayers,
+            status: room.Status
         );
     }
 
@@ -24,7 +25,10 @@ public static class RoomMapper
             roomName: roomDto.Name,
             isPrivate: roomDto.IsPrivate,
             ownerId: roomDto.OwnerId,
-            maxPlayers: roomDto.MaxPlayers
+            status: roomDto.Status,
+            maxPlayers: roomDto.MaxPlayers,
+            createdAt: DateTime.UtcNow, 
+            updatedAt: DateTime.UtcNow  
         );
     }
 
@@ -34,7 +38,8 @@ public static class RoomMapper
             roomCode: room.RoomCode,
             roomName: room.RoomName,
             isPrivate: room.IsPrivate,
-            playerCount: playerCount
+            playerCount: playerCount,
+            status: room.Status
         );
     }
 }

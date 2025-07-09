@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.Entity.Users;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Questions;
 
 public static class SubmitAnswerRequestMapper
 {
@@ -13,7 +13,9 @@ public static class SubmitAnswerRequestMapper
             questionId: request.QuestionId,
             answerId: request.AnswerId,
             isCorrect: false,
-            timeTaken: TimeSpan.Zero
+            timeTaken: TimeSpan.Zero,
+            createdAt: DateTime.UtcNow, 
+            updatedAt: DateTime.UtcNow 
         );
     }
 }

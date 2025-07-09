@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Users;
+using ConsoleApp1.Model.Entity.Users;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Users;
 
 public static class UserMapper
 {
@@ -12,7 +12,7 @@ public static class UserMapper
             username: user.Username,
             fullName: user.FullName,
             email: user.Email,
-            phone: user.Phone,
+            phoneNumber: user.PhoneNumber,
             address: user.Address,
             password: user.Password,
             typeAccount: user.TypeAccount
@@ -22,13 +22,16 @@ public static class UserMapper
     public static User ToEntity(UserDTO userDto)
     {
         return new User(
+            id: userDto.Id,
             username: userDto.Username,
             password: userDto.Password,
             fullName: userDto.FullName,
             email: userDto.Email,
-            phone: userDto.Phone,
+            phoneNumber: userDto.PhoneNumber,
             address: userDto.Address,
-            typeAccount: userDto.TypeAccount
+            typeAccount: userDto.TypeAccount,
+            createdAt: DateTime.UtcNow,
+            updatedAt: DateTime.UtcNow
         );
     }
 }

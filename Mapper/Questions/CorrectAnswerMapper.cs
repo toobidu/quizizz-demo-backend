@@ -1,7 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.Entity.Questions;
 
-namespace ConsoleApp1.Mapper;
+namespace ConsoleApp1.Mapper.Questions;
 
 public static class CorrectAnswerMapper
 {

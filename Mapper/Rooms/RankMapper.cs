@@ -1,8 +1,7 @@
-﻿using ConsoleApp1.Model.DTO;
-using ConsoleApp1.Model.Entity;
+﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.Entity.Questions;
 
-namespace ConsoleApp1.Mapper;
-
+namespace ConsoleApp1.Mapper.Rooms;
 public static class RankMapper
 {
     public static RankDTO ToDTO(Rank rank, string username)
@@ -23,6 +22,7 @@ public static class RankMapper
             userId: rankDto.UserId,
             totalScore: rankDto.TotalScore,
             gamesPlayed: rankDto.GamesPlayed,
+            createdAt: DateTime.UtcNow, // Example value
             updatedAt: DateTime.Parse(rankDto.UpdatedAt)
         );
     }
