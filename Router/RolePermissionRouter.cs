@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Text;
 using System.Text.Json;
+using ConsoleApp1.Config;
 using ConsoleApp1.Controller;
 
 namespace ConsoleApp1.Router;
@@ -26,56 +27,66 @@ public class RolePermissionRouter : IBaseRouter
             string? token = GetAccessToken(request);
             if (token == null)
             {
-                response.StatusCode = 401;
-                await WriteJson(response, new { error = "Thiếu hoặc sai Authorization header" });
+                HttpResponseHelper.WriteUnauthorized(response, "Thiếu hoặc sai thông tin xác thực", path);
                 return true;
             }
 
             if (method == "POST" && path == "/api/role-permission/assign")
             {
-                int roleId = int.Parse(request.QueryString["roleId"]!);
-                int permissionId = int.Parse(request.QueryString["permissionId"]!);
+                if (!TryParseIntQuery(request, "roleId", out var roleId) || !TryParseIntQuery(request, "permissionId", out var permissionId))
+                {
+                    HttpResponseHelper.WriteBadRequest(response, "Thiếu roleId hoặc permissionId", path);
+                    return true;
+                }
+
                 var result = await _controller.AssignPermissionToRoleApi(roleId, permissionId, token);
-                await WriteJson(response, new { message = result });
+                HttpResponseHelper.WriteSuccess(response, result, "Gán quyền thành công", path);
                 return true;
             }
-            else if (method == "DELETE" && path == "/api/role-permission/remove")
+
+            if (method == "DELETE" && path == "/api/role-permission/remove")
             {
-                int roleId = int.Parse(request.QueryString["roleId"]!);
-                int permissionId = int.Parse(request.QueryString["permissionId"]!);
-                var result = await _controller.RemovePermissionFromRoleApi( roleId, permissionId, token);
-                await WriteJson(response, new { message = result });
+                if (!TryParseIntQuery(request, "roleId", out var roleId) || !TryParseIntQuery(request, "permissionId", out var permissionId))
+                {
+                    HttpResponseHelper.WriteBadRequest(response, "Thiếu roleId hoặc permissionId", path);
+                    return true;
+                }
+
+                var result = await _controller.RemovePermissionFromRoleApi(roleId, permissionId, token);
+                HttpResponseHelper.WriteSuccess(response, result, "Xóa quyền khỏi vai trò thành công", path);
                 return true;
             }
-            else if (method == "POST" && path == "/api/role-permission/assign-multiple")
+
+            if (method == "POST" && path == "/api/role-permission/assign-multiple")
             {
                 var jsonDoc = await ParseJson(request);
                 int roleId = jsonDoc.RootElement.GetProperty("roleId").GetInt32();
-                var permissionIds = jsonDoc.RootElement.GetProperty("permissionIds").EnumerateArray().Select(p => p.GetInt32()).ToList();
+                var permissionIds = jsonDoc.RootElement.GetProperty("permissionIds")
+                    .EnumerateArray().Select(p => p.GetInt32()).ToList();
+
                 var result = await _controller.AssignMultiplePermissionsToRoleApi(roleId, permissionIds, token);
-                await WriteJson(response, new { message = result });
+                HttpResponseHelper.WriteSuccess(response, result, "Gán nhiều quyền thành công", path);
                 return true;
             }
-            else if (method == "DELETE" && path == "/api/role-permission/remove-multiple")
+
+            if (method == "DELETE" && path == "/api/role-permission/remove-multiple")
             {
                 var jsonDoc = await ParseJson(request);
                 int roleId = jsonDoc.RootElement.GetProperty("roleId").GetInt32();
-                var permissionIds = jsonDoc.RootElement.GetProperty("permissionIds").EnumerateArray().Select(p => p.GetInt32()).ToList();
+                var permissionIds = jsonDoc.RootElement.GetProperty("permissionIds")
+                    .EnumerateArray().Select(p => p.GetInt32()).ToList();
+
                 var result = await _controller.RemoveMultiplePermissionsFromRoleApi(roleId, permissionIds, token);
-                await WriteJson(response, new { message = result });
+                HttpResponseHelper.WriteSuccess(response, result, "Xóa nhiều quyền khỏi vai trò thành công", path);
                 return true;
             }
-            else
-            {
-                response.StatusCode = 404;
-                await WriteJson(response, new { error = "404 Not Found" });
-                return true;
-            }
+
+            HttpResponseHelper.WriteNotFound(response, "Không tìm thấy API yêu cầu", path);
+            return true;
         }
         catch (Exception ex)
         {
-            response.StatusCode = 500;
-            await WriteJson(response, new { error = "Internal Server Error", detail = ex.Message });
+            HttpResponseHelper.WriteInternalServerError(response, ex.Message, path);
             return true;
         }
     }
@@ -84,7 +95,7 @@ public class RolePermissionRouter : IBaseRouter
     {
         string? authHeader = request.Headers["Authorization"];
         if (authHeader == null || !authHeader.StartsWith("Bearer ")) return null;
-        return authHeader.Substring("Bearer ".Length).Trim();
+        return authHeader["Bearer ".Length..].Trim();
     }
 
     private static async Task<JsonDocument> ParseJson(HttpListenerRequest req)
@@ -93,13 +104,10 @@ public class RolePermissionRouter : IBaseRouter
         return JsonDocument.Parse(await reader.ReadToEndAsync());
     }
 
-    private static async Task WriteJson(HttpListenerResponse res, object data)
+    private static bool TryParseIntQuery(HttpListenerRequest request, string key, out int value)
     {
-        var json = JsonSerializer.Serialize(data);
-        var buffer = Encoding.UTF8.GetBytes(json);
-        res.ContentType = "application/json";
-        res.ContentEncoding = Encoding.UTF8;
-        res.ContentLength64 = buffer.Length;
-        await res.OutputStream.WriteAsync(buffer);
+        value = 0;
+        var valStr = request.QueryString[key];
+        return valStr != null && int.TryParse(valStr, out value);
     }
 }

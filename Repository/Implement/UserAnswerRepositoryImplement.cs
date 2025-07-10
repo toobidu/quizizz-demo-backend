@@ -50,6 +50,26 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         return result.ToList();
     }
 
+    public async Task<IEnumerable<UserAnswer>> GetRecentAnswersByUserIdAsync(int userId, int gameLimit)
+    {
+        const string query = @"
+            SELECT ua.*, q.topic_id 
+            FROM user_answers ua
+            JOIN questions q ON ua.question_id = q.id
+            WHERE ua.user_id = @UserId 
+            ORDER BY ua.created_at DESC 
+            LIMIT @GameLimit * 10";
+        using var conn = CreateConnection();
+        var result = await conn.QueryAsync<UserAnswer, int, UserAnswer>(query,
+            (userAnswer, topicId) => {
+                userAnswer.Question = new() { TopicId = topicId };
+                return userAnswer;
+            },
+            new { UserId = userId, GameLimit = gameLimit },
+            splitOn: "topic_id");
+        return result.ToList();
+    }
+
     public async Task<int> AddAsync(UserAnswer answer)
     {
         const string query = @"

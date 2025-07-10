@@ -1,12 +1,12 @@
 ﻿using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
 
-public class AuthorizationService : IAuthorizationService
+public class AuthorizationServiceImplement : IAuthorizationService
 {
     private readonly IRedisService _redisService;
     private readonly IPermissionRepository _permissionRepo;
 
-    public AuthorizationService(IRedisService redisService, IPermissionRepository permissionRepo)
+    public AuthorizationServiceImplement(IRedisService redisService, IPermissionRepository permissionRepo)
     {
         _redisService = redisService;
         _permissionRepo = permissionRepo;

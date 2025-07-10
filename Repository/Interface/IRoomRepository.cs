@@ -10,8 +10,10 @@ public interface IRoomRepository
     Task UpdateAsync(Room room);
     Task<bool> DeleteAsync(int id);
     Task<IEnumerable<Room>> GetAllAsync();
+    Task<IEnumerable<Room>> GetPublicWaitingRoomsAsync();
     Task<Room> UpdateStatusAsync(int roomId, string status);
     Task<IEnumerable<Room>> GetActiveRoomsAsync();
     Task<int> GetPlayerCountAsync(int roomId);
     Task UpdateMaxPlayersAsync(int roomId, int maxPlayers);
+    Task<bool> ExistsByCodeAsync(string roomCode);
 }

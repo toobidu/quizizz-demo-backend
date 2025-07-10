@@ -48,8 +48,8 @@ public class UserRepositoryImplement : IUserRepository
     {
         const string query = @"
         INSERT INTO users (username, full_name, email, phone_number, address, password, type_account)
-        VALUES (@Username, @FullName, @Email, @Phone, @Address, @Password, @TypeAccount)
-        RETURNING id";
+        VALUES (@Username, @FullName, @Email, @PhoneNumber, @Address, @Password, @TypeAccount)
+        RETURNING *";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, user);
     }
@@ -61,7 +61,7 @@ public class UserRepositoryImplement : IUserRepository
         SET username = @Username,
             full_name = @FullName,
             email = @Email,
-            phone_number = @Phone,
+            phone_number = @PhoneNumber,
             address = @Address,
             password = @Password,
             type_account = @TypeAccount
@@ -101,6 +101,39 @@ public class UserRepositoryImplement : IUserRepository
         const string query = @"SELECT EXISTS (SELECT 1 FROM users WHERE username = @Username)";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<bool>(query, new { Username = username });
+    }
+
+    public async Task<User?> GetByEmailAsync(string email)
+    {
+        Console.WriteLine($"[USER_REPO] GetByEmailAsync called with: '{email}'");
+        Console.WriteLine($"[USER_REPO] Email is null or empty: {string.IsNullOrEmpty(email)}");
+        
+        const string query = @"
+        SELECT 
+            id AS Id,
+            username AS Username,
+            full_name AS FullName,
+            email AS Email,
+            phone_number AS PhoneNumber,
+            address AS Address,
+            password AS Password,
+            type_account AS TypeAccount
+        FROM users 
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM(@Email))";
+        
+        Console.WriteLine($"[USER_REPO] Executing query with email parameter: '{email}'");
+        
+        using var conn = CreateConnection();
+        var user = await conn.QuerySingleOrDefaultAsync<User>(query, new { Email = email });
+        
+        Console.WriteLine($"[USER_REPO] Query result for email '{email}': {(user != null ? $"Found user ID {user.Id}" : "No user found")}");
+        
+        if (user != null)
+        {
+            Console.WriteLine($"[USER_REPO] User details - ID: {user.Id}, Username: {user.Username}, Email: {user.Email}");
+        }
+        
+        return user;
     }
 
     public async Task<IEnumerable<User>> GetAllAsync()

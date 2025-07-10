@@ -34,8 +34,8 @@ public class RoomRepositoryImplement : IRoomRepository
 
     public async Task<int> AddAsync(Room room)
     {
-        const string query = @"INSERT INTO rooms (room_code, room_name, is_private, owner_id) 
-                               VALUES (@RoomCode, @RoomName, @IsPrivate, @OwnerId) 
+        const string query = @"INSERT INTO rooms (room_code, room_name, is_private, owner_id, status, max_players) 
+                               VALUES (@RoomCode, @RoomName, @IsPrivate, @OwnerId, @Status, @MaxPlayers) 
                                RETURNING id";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, room);
@@ -43,7 +43,9 @@ public class RoomRepositoryImplement : IRoomRepository
 
     public async Task UpdateAsync(Room room)
     {
-        const string query = @"UPDATE rooms SET room_name = @RoomName, is_private = @IsPrivate 
+        const string query = @"UPDATE rooms SET room_name = @RoomName, is_private = @IsPrivate, 
+                               owner_id = @OwnerId, status = @Status, max_players = @MaxPlayers,
+                               updated_at = @UpdatedAt
                                WHERE id = @Id";
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, room);
@@ -97,5 +99,20 @@ public class RoomRepositoryImplement : IRoomRepository
         WHERE id = @Id";
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, new { Id = roomId, MaxPlayers = maxPlayers });
+    }
+
+    public async Task<IEnumerable<Room>> GetPublicWaitingRoomsAsync()
+    {
+        const string query = @"SELECT * FROM rooms WHERE is_private = false AND status = 'waiting'";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<Room>(query);
+    }
+
+    public async Task<bool> ExistsByCodeAsync(string roomCode)
+    {
+        const string query = @"SELECT COUNT(*) FROM rooms WHERE room_code = @RoomCode";
+        using var conn = CreateConnection();
+        var count = await conn.ExecuteScalarAsync<int>(query, new { RoomCode = roomCode });
+        return count > 0;
     }
 }

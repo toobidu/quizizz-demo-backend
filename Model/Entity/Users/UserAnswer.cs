@@ -1,4 +1,6 @@
-﻿namespace ConsoleApp1.Model.Entity.Users;
+﻿using ConsoleApp1.Model.Entity.Questions;
+
+namespace ConsoleApp1.Model.Entity.Users;
 
 public class UserAnswer
 {
@@ -10,6 +12,7 @@ public class UserAnswer
     public TimeSpan TimeTaken { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public Question? Question { get; set; }
 
     public UserAnswer() { }
 

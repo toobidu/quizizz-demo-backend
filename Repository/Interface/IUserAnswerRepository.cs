@@ -8,6 +8,7 @@ public interface IUserAnswerRepository
     Task<IEnumerable<UserAnswer>> GetByUserIdAsync(int userId);
     Task<IEnumerable<UserAnswer>> GetByRoomIdAsync(int roomId);
     Task<IEnumerable<UserAnswer>> GetByQuestionIdAsync(int questionId);
+    Task<IEnumerable<UserAnswer>> GetRecentAnswersByUserIdAsync(int userId, int gameLimit);
     Task<int> AddAsync(UserAnswer answer);
     Task UpdateAsync(UserAnswer answer);
     Task<bool> DeleteByUserIdRoomIdQuestionIdAsync(int userId, int roomId, int questionId);

@@ -1,11 +1,13 @@
 ﻿using ConsoleApp1.Mapper;
+using ConsoleApp1.Mapper.Users;
 using ConsoleApp1.Model.DTO;
+using ConsoleApp1.Model.DTO.Users;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
 
 namespace ConsoleApp1.Service.Implement;
 
-public class RolePermissionService : IRolePermissionService
+public class RolePermissionServiceImplement : IRolePermissionService
 {
     private readonly IRolePermissionRepository _rolePermissionRepo;
     private readonly IPermissionRepository _permissionRepo;
@@ -14,7 +16,7 @@ public class RolePermissionService : IRolePermissionService
     private readonly IUserRepository _userRepo;
     private readonly IRedisService _redisService;
 
-    public RolePermissionService(
+    public RolePermissionServiceImplement(
         IRolePermissionRepository rolePermissionRepo,
         IPermissionRepository permissionRepo,
         IRoleRepository roleRepo,

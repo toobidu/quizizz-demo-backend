@@ -4,10 +4,10 @@ using StackExchange.Redis;
 
 namespace ConsoleApp1.Service.Implement;
 
-public class RedisService : IRedisService
+public class RedisServiceImplement : IRedisService
 {
     private readonly IDatabase db;
-    public RedisService(RedisConnection connection)
+    public RedisServiceImplement(RedisConnection connection)
     {
         db = connection.GetDatabase();
     }
@@ -63,5 +63,21 @@ public class RedisService : IRedisService
     public async Task DeleteRefreshTokenAsync(int userId)
     {
         await db.KeyDeleteAsync($"refresh:{userId}");
+    }
+
+    public async Task SetStringAsync(string key, string value, TimeSpan expiry)
+    {
+        await db.StringSetAsync(key, value, expiry);
+    }
+
+    public async Task<string?> GetStringAsync(string key)
+    {
+        var value = await db.StringGetAsync(key);
+        return value.HasValue ? value.ToString() : null;
+    }
+
+    public async Task DeleteAsync(string key)
+    {
+        await db.KeyDeleteAsync(key);
     }
 }

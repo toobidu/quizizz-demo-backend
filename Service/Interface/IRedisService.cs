@@ -10,4 +10,7 @@ public interface IRedisService
     Task SetRefreshTokenAsync(int userId, string refreshToken, TimeSpan expiry);
     Task<string?> GetRefreshTokenAsync(int userId);
     Task DeleteRefreshTokenAsync(int userId);
+    Task SetStringAsync(string key, string value, TimeSpan expiry);
+    Task<string?> GetStringAsync(string key);
+    Task DeleteAsync(string key);
 }
