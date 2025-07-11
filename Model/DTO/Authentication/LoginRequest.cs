@@ -5,10 +5,10 @@ namespace ConsoleApp1.Model.DTO.Authentication;
 public class LoginRequest
 {
     [JsonPropertyName("username")]
-    public string Username { get; set; }
+    public string Username { get; set; } = string.Empty;
 
     [JsonPropertyName("password")]
-    public string Password { get; set; }
+    public string Password { get; set; } = string.Empty;
     public LoginRequest() { }
 
     public LoginRequest(string username, string password)

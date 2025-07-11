@@ -3,7 +3,7 @@
 public class Question
 {
     public int Id { get; set; }
-    public string QuestionText { get; set; }
+    public string QuestionText { get; set; } = string.Empty;
     public int? TopicId { get; set; }
     public int? QuestionTypeId { get; set; }
     public DateTime CreatedAt { get; set; }

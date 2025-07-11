@@ -7,11 +7,27 @@ public static class HttpResponseHelper
 {
     public static void WriteJsonResponse<T>(HttpListenerResponse response, ApiResponse<T> apiResponse)
     {
+        SetCorsHeaders(response);
         response.StatusCode = apiResponse.Status;
         response.ContentType = "application/json";
         string json = JsonSerializer.Serialize(apiResponse);
         using var writer = new StreamWriter(response.OutputStream);
         writer.Write(json);
+    }
+
+    public static void SetCorsHeaders(HttpListenerResponse response)
+    {
+        response.Headers.Add("Access-Control-Allow-Origin", "http://localhost:5173");
+        response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        response.Headers.Add("Access-Control-Allow-Credentials", "true");
+    }
+
+    public static void WriteOptionsResponse(HttpListenerResponse response)
+    {
+        SetCorsHeaders(response);
+        response.StatusCode = 200;
+        response.ContentLength64 = 0;
     }
 
     public static void WriteSuccess<T>(HttpListenerResponse response, T data, string message, string? path = null)

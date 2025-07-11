@@ -12,12 +12,14 @@ public class UserProfileDTO
     public TimeSpan FastestTime { get; set; }
     public int HighestScore { get; set; }
     public string BestTopic { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public bool IsOwnProfile { get; set; } = false; // Đánh dấu có phải profile của chính mình không
 
     public UserProfileDTO(int id, string username, string fullName, string email, 
                          string phoneNumber, string address, int highestRank, 
-                         TimeSpan fastestTime, int highestScore, string bestTopic) =>
+                         TimeSpan fastestTime, int highestScore, string bestTopic, DateTime createdAt) =>
         (Id, Username, FullName, Email, PhoneNumber, Address, HighestRank, 
-         FastestTime, HighestScore, BestTopic) = 
+         FastestTime, HighestScore, BestTopic, CreatedAt, IsOwnProfile) = 
         (id, username, fullName, email, phoneNumber, address, highestRank, 
-         fastestTime, highestScore, bestTopic);
+         fastestTime, highestScore, bestTopic, createdAt, false);
 }

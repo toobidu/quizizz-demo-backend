@@ -3,11 +3,11 @@
 public class Room
 {
     public int Id { get; set; }
-    public string RoomCode { get; set; }
-    public string RoomName { get; set; }
+    public string RoomCode { get; set; } = string.Empty;
+    public string RoomName { get; set; } = string.Empty;
     public bool IsPrivate { get; set; }
     public int OwnerId { get; set; }
-    public string Status { get; set; }
+    public string Status { get; set; } = string.Empty;
     public int MaxPlayers { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

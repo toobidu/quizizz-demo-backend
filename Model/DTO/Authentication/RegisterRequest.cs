@@ -4,14 +4,14 @@ namespace ConsoleApp1.Model.DTO.Authentication;
 
 public class RegisterRequest
 {
-    [JsonPropertyName("username")] public string Username { get; set; }
-    [JsonPropertyName("full_name")] public string FullName { get; set; }
-    [JsonPropertyName("email")] public string Email { get; set; }
-    [JsonPropertyName("phone_number")] public string PhoneNumber { get; set; }
-    [JsonPropertyName("address")] public string Address { get; set; }
+    [JsonPropertyName("username")] public string Username { get; set; } = string.Empty;
+    [JsonPropertyName("full_name")] public string FullName { get; set; } = string.Empty;
+    [JsonPropertyName("email")] public string Email { get; set; } = string.Empty;
+    [JsonPropertyName("phone_number")] public string PhoneNumber { get; set; } = string.Empty;
+    [JsonPropertyName("address")] public string Address { get; set; } = string.Empty;
 
-    [JsonPropertyName("password")] public string Password { get; set; }
-    [JsonPropertyName("confirm_password")] public string ConfirmPassword { get; set; }
+    [JsonPropertyName("password")] public string Password { get; set; } = string.Empty;
+    [JsonPropertyName("confirm_password")] public string ConfirmPassword { get; set; } = string.Empty;
 
     public RegisterRequest()
     {

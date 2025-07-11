@@ -19,7 +19,20 @@ public class UserRepositoryImplement : IUserRepository
 
     public async Task<User?> GetByIdAsync(int id)
     {
-        const string query = @"SELECT * FROM users WHERE id = @Id";
+        const string query = @"
+        SELECT 
+            id AS Id,
+            username AS Username,
+            full_name AS FullName,
+            email AS Email,
+            phone_number AS PhoneNumber,
+            address AS Address,
+            password AS Password,
+            type_account AS TypeAccount,
+            created_at AS CreatedAt,
+            updated_at AS UpdatedAt
+        FROM users 
+        WHERE id = @Id";
         using var conn = CreateConnection();
         return await conn.QuerySingleOrDefaultAsync<User>(query, new { Id = id });
     }
@@ -30,8 +43,14 @@ public class UserRepositoryImplement : IUserRepository
         SELECT 
             id AS Id,
             username AS Username,
+            full_name AS FullName,
+            email AS Email,
+            phone_number AS PhoneNumber,
+            address AS Address,
             password AS Password,
-            type_account AS TypeAccount
+            type_account AS TypeAccount,
+            created_at AS CreatedAt,
+            updated_at AS UpdatedAt
         FROM users 
         WHERE username = @Username";
         using var conn = CreateConnection();
@@ -64,7 +83,8 @@ public class UserRepositoryImplement : IUserRepository
             phone_number = @PhoneNumber,
             address = @Address,
             password = @Password,
-            type_account = @TypeAccount
+            type_account = @TypeAccount,
+            updated_at = @UpdatedAt
         WHERE id = @Id";
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, user);
@@ -142,5 +162,12 @@ public class UserRepositoryImplement : IUserRepository
         using var conn = CreateConnection();
         var result = await conn.QueryAsync<User>(query);
         return result.ToList();
+    }
+
+    public async Task<User?> GetByPhoneNumberAsync(string phoneNumber)
+    {
+        const string query = @"SELECT id, phone_number FROM users WHERE phone_number = @PhoneNumber";
+        using var conn = CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<User>(query, new { PhoneNumber = phoneNumber });
     }
 }

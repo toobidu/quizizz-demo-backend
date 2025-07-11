@@ -1,5 +1,6 @@
 using ConsoleApp1.Model.DTO.Users;
 using ConsoleApp1.Model.Entity.Questions;
+using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
 using BCrypt.Net;
@@ -30,11 +31,13 @@ public class UserProfileServiceImplement : IUserProfileService
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null) return null;
 
+        Console.WriteLine($"[DEBUG] User from DB - Id: {user.Id}, Username: {user.Username}, FullName: '{user.FullName}', PhoneNumber: '{user.PhoneNumber}', Address: '{user.Address}'");
+
         var stats = await GetUserStatsAsync(userId);
         return new UserProfileDTO(
             user.Id, user.Username, user.FullName, user.Email,
             user.PhoneNumber, user.Address, stats.HighestRank,
-            stats.FastestTime, stats.HighestScore, stats.BestTopic);
+            stats.FastestTime, stats.HighestScore, stats.BestTopic, user.CreatedAt);
     }
 
     public async Task<UserProfileDTO?> SearchUserByUsernameAsync(string username)
@@ -46,7 +49,7 @@ public class UserProfileServiceImplement : IUserProfileService
         return new UserProfileDTO(
             user.Id, user.Username, user.FullName, user.Email,
             user.PhoneNumber, user.Address, stats.HighestRank,
-            stats.FastestTime, stats.HighestScore, stats.BestTopic);
+            stats.FastestTime, stats.HighestScore, stats.BestTopic, user.CreatedAt);
     }
 
     public async Task<bool> ChangePasswordAsync(int userId, ChangePasswordRequest request)
@@ -65,25 +68,48 @@ public class UserProfileServiceImplement : IUserProfileService
 
     public async Task<bool> UpdateProfileAsync(int userId, UpdateProfileRequest request)
     {
+        Console.WriteLine($"[DEBUG] UpdateProfile - UserId: {userId}, FullName: '{request.FullName}', PhoneNumber: '{request.PhoneNumber}', Address: '{request.Address}'");
+        
         var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null) return false;
+        if (user == null) 
+        {
+            Console.WriteLine($"[DEBUG] User not found with ID: {userId}");
+            return false;
+        }
 
-        user.FullName = request.FullName;
-        user.PhoneNumber = request.PhoneNumber;
-        user.Address = request.Address;
+        Console.WriteLine($"[DEBUG] Current user - FullName: '{user.FullName}', PhoneNumber: '{user.PhoneNumber}', Address: '{user.Address}'");
+
+        // Kiểm tra phone number trùng lặp nếu có thay đổi
+        if (!string.IsNullOrEmpty(request.PhoneNumber) && request.PhoneNumber != user.PhoneNumber)
+        {
+            Console.WriteLine($"[DEBUG] Checking phone number duplicate: {request.PhoneNumber}");
+            var existingUser = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
+            if (existingUser != null && existingUser.Id != userId)
+            {
+                Console.WriteLine($"[DEBUG] Phone number already exists for user ID: {existingUser.Id}");
+                return false; // Phone number đã tồn tại
+            }
+        }
+
+        user.FullName = request.FullName ?? user.FullName;
+        user.PhoneNumber = request.PhoneNumber ?? user.PhoneNumber;
+        user.Address = request.Address ?? user.Address;
         user.UpdatedAt = DateTime.UtcNow;
+        
+        Console.WriteLine($"[DEBUG] Updating user - FullName: '{user.FullName}', PhoneNumber: '{user.PhoneNumber}', Address: '{user.Address}'");
         await _userRepository.UpdateAsync(user);
+        Console.WriteLine($"[DEBUG] Update completed successfully");
         return true;
     }
 
     private async Task<UserStats> GetUserStatsAsync(int userId)
     {
-        var userAnswers = await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 5);
+        var userAnswers = await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 100); // Lấy nhiều hơn để tính toán chính xác
         
         var highestRank = await GetHighestRankAsync(userId);
         var fastestTime = userAnswers.Any() ? userAnswers.Min(ua => ua.TimeTaken) : TimeSpan.Zero;
-        var highestScore = await GetHighestScoreAsync(userId);
-        var bestTopic = await GetBestTopicAsync(userId);
+        var highestScore = await GetHighestScoreAsync(userId, userAnswers);
+        var bestTopic = await GetBestTopicAsync(userId, userAnswers);
 
         return new UserStats(highestRank, fastestTime, highestScore, bestTopic);
     }
@@ -94,22 +120,36 @@ public class UserProfileServiceImplement : IUserProfileService
         return rank?.TotalScore ?? 0;
     }
 
-    private async Task<int> GetHighestScoreAsync(int userId)
+    private async Task<int> GetHighestScoreAsync(int userId, IEnumerable<UserAnswer>? userAnswers = null)
     {
-        var userAnswers = await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 5);
-        return userAnswers.Any() ? userAnswers.Max(ua => ua.IsCorrect ? 100 : 0) : 0;
+        userAnswers ??= await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 100);
+        if (!userAnswers.Any()) return 0;
+        
+        // Tính điểm cao nhất dựa trên room session
+        var roomSessions = userAnswers.GroupBy(ua => ua.RoomId)
+            .Where(g => g.Key > 0)
+            .Select(g => g.Count(ua => ua.IsCorrect) * 10) // 10 điểm mỗi câu đúng
+            .DefaultIfEmpty(0);
+            
+        return roomSessions.Max();
     }
 
-    private async Task<string> GetBestTopicAsync(int userId)
+    private async Task<string> GetBestTopicAsync(int userId, IEnumerable<UserAnswer>? userAnswers = null)
     {
-        var userAnswers = await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 5);
+        userAnswers ??= await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 100);
         if (!userAnswers.Any()) return "None";
 
         var topicStats = userAnswers
             .Where(ua => ua.Question?.TopicId != null)
-            .GroupBy(ua => ua.Question.TopicId.Value)
-            .Select(g => new { TopicId = g.Key, CorrectCount = g.Count(ua => ua.IsCorrect) })
-            .OrderByDescending(ts => ts.CorrectCount)
+            .GroupBy(ua => ua.Question!.TopicId!.Value)
+            .Select(g => new { 
+                TopicId = g.Key, 
+                CorrectRate = g.Count(ua => ua.IsCorrect) / (double)g.Count(),
+                TotalAnswers = g.Count()
+            })
+            .Where(ts => ts.TotalAnswers >= 3) // Ít nhất 3 câu hỏi
+            .OrderByDescending(ts => ts.CorrectRate)
+            .ThenByDescending(ts => ts.TotalAnswers)
             .FirstOrDefault();
 
         if (topicStats != null)

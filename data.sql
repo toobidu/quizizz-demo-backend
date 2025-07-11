@@ -237,8 +237,7 @@ CREATE TABLE user_answers
 );
 
 CREATE TRIGGER update_user_answers_timestamp
-    BEFORE INSERT OR
-UPDATE ON user_answers
+    BEFORE INSERT OR UPDATE ON user_answers
     FOR EACH ROW
     EXECUTE FUNCTION update_timestamp();
 

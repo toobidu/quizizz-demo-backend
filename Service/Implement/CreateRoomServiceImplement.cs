@@ -33,9 +33,17 @@ public class CreateRoomServiceImplement : ICreateRoomService
         _roleRepository = roleRepository;
     }
 
-    public async Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request)
+    public async Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request, int userId)
     {
-        var currentUserId = GetCurrentUserId();
+        Console.WriteLine($"[CREATE_ROOM_SERVICE] Creating room for userId: {userId}");
+        
+        // Kiểm tra user đã ở trong phòng nào chưa
+        var existingRoom = await _roomPlayerRepository.GetActiveRoomByUserIdAsync(userId);
+        if (existingRoom != null)
+        {
+            throw new InvalidOperationException($"Bạn đang ở trong phòng {existingRoom.RoomCode}. Vui lòng rời phòng trước khi tạo phòng mới.");
+        }
+        
         var roomCode = await GenerateUniqueRoomCodeAsync();
         
         var room = new Room
@@ -43,7 +51,7 @@ public class CreateRoomServiceImplement : ICreateRoomService
             RoomCode = roomCode,
             RoomName = request.Name,
             IsPrivate = request.IsPrivate,
-            OwnerId = currentUserId,
+            OwnerId = userId,
             Status = "waiting",
             MaxPlayers = request.MaxPlayers,
             CreatedAt = DateTime.UtcNow,
@@ -55,7 +63,20 @@ public class CreateRoomServiceImplement : ICreateRoomService
 
         await SetupRoomSettingsAsync(roomId, request);
         await UpdateUserTypeAccountAsync(room.OwnerId);
-
+        
+        // Tự động thêm owner vào phòng như một player
+        var roomPlayer = new RoomPlayer
+        {
+            RoomId = roomId,
+            UserId = userId,
+            Score = 0,
+            TimeTaken = TimeSpan.Zero,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        await _roomPlayerRepository.AddAsync(roomPlayer);
+        
+        Console.WriteLine($"[CREATE_ROOM_SERVICE] Room {roomCode} created successfully with owner {userId}");
         return RoomMapper.ToDTO(room);
     }
 
@@ -212,26 +233,19 @@ public class CreateRoomServiceImplement : ICreateRoomService
     {
         var settings = new List<RoomSetting>
         {
-            new(roomId, "game_mode", request.GameMode)
+            new(roomId, "game_mode", request.GameMode),
+            new(roomId, "topic_id", request.TopicId?.ToString() ?? "1"),
+            new(roomId, "question_count", request.QuestionCount?.ToString() ?? "10"),
+            new(roomId, "countdown_seconds", request.CountdownSeconds?.ToString() ?? "300")
         };
-
-        if (request.TopicId.HasValue)
-            settings.Add(new(roomId, "topic_id", request.TopicId.Value.ToString()));
-        
-        if (request.QuestionCount.HasValue)
-            settings.Add(new(roomId, "question_count", request.QuestionCount.Value.ToString()));
-        
-        if (request.CountdownSeconds.HasValue)
-            settings.Add(new(roomId, "countdown_seconds", request.CountdownSeconds.Value.ToString()));
 
         foreach (var setting in settings)
         {
             await _roomSettingsRepository.AddSettingAsync(setting);
         }
+        
+        Console.WriteLine($"[CREATE_ROOM_SERVICE] Room {roomId} settings: GameMode={request.GameMode}, TopicId={request.TopicId ?? 1}, Questions={request.QuestionCount ?? 10}, Time={request.CountdownSeconds ?? 300}s");
     }
 
-    private int GetCurrentUserId()
-    {
-        return 1;
-    }
+
 }

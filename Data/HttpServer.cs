@@ -32,24 +32,42 @@ public class HttpServer
     {
         var request = context.Request;
         var response = context.Response;
+        
+        string path = request.Url?.AbsolutePath ?? "unknown";
+        string method = request.HttpMethod;
+        string clientIP = request.RemoteEndPoint?.Address?.ToString() ?? "unknown";
+        
+        Console.WriteLine($"[HttpServer] Incoming request: {method} {path} from {clientIP}");
+        Console.WriteLine($"[HttpServer] Headers: {string.Join(", ", request.Headers.AllKeys.Select(k => $"{k}={request.Headers[k]}"))}");
 
         try
         {
+            bool routeFound = false;
             foreach (var router in _routers)
             {
                 bool handled = await router.HandleAsync(request, response);
                 if (handled)
                 {
+                    Console.WriteLine($"[HttpServer] Request {method} {path} handled by {router.GetType().Name}");
+                    routeFound = true;
                     response.OutputStream.Close();
                     return;
                 }
             }
 
-            response.StatusCode = 404;
-            await WriteJson(response, new { error = "404 Not Found" });
+            if (!routeFound)
+            {
+                Console.WriteLine($"[HttpServer] No router found for {method} {path}");
+                SetCorsHeaders(response);
+                response.StatusCode = 404;
+                await WriteJson(response, new { error = "404 Not Found", path = path });
+            }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[HttpServer] Error handling {method} {path}: {ex.Message}");
+            Console.WriteLine($"[HttpServer] Stack trace: {ex.StackTrace}");
+            SetCorsHeaders(response);
             response.StatusCode = 500;
             await WriteJson(response, new { error = "Internal Server Error", detail = ex.Message });
         }
@@ -65,5 +83,13 @@ public class HttpServer
         res.ContentEncoding = Encoding.UTF8;
         res.ContentLength64 = buffer.Length;
         await res.OutputStream.WriteAsync(buffer);
+    }
+
+    private static void SetCorsHeaders(HttpListenerResponse response)
+    {
+        response.Headers.Add("Access-Control-Allow-Origin", "http://localhost:5173");
+        response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        response.Headers.Add("Access-Control-Allow-Credentials", "true");
     }
 }

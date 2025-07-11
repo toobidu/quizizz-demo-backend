@@ -62,7 +62,7 @@ public class RoleServiceImplement : IRoleService
     {
         var userRoles = await _userRoleRepository.GetByUserIdAsync(userId);
         var roles = userRoles.Select(ur => _roleRepository.GetByIdAsync(ur.RoleId).Result).Where(r => r != null);
-        return roles.Select(RoleMapper.ToDTO).ToList();
+        return roles.Select(r => RoleMapper.ToDTO(r!)).ToList();
     }
 
     public async Task<bool> RoleNameExistsAsync(string roleName)
@@ -74,7 +74,7 @@ public class RoleServiceImplement : IRoleService
     {
         var rolePermissions = await _rolePermissionRepository.GetByPermissionIdAsync(permissionId);
         var roles = rolePermissions.Select(rp => _roleRepository.GetByIdAsync(rp.RoleId).Result).Where(r => r != null);
-        return roles.Select(RoleMapper.ToDTO).ToList();
+        return roles.Select(r => RoleMapper.ToDTO(r!)).ToList();
     }
 
     public async Task<List<RoleDTO>> GetRolesByUserIdAndPermissionNamesAsync(int userId, List<string> permissionNames)

@@ -8,6 +8,7 @@ public class GamePlayer
     public int Score { get; set; } = 0;
     public string Status { get; set; } = "waiting"; // waiting, ready, answering, answered
     public bool IsHost { get; set; } = false;
+    public DateTime? JoinTime { get; set; }
 }
 
 public class GameRoom

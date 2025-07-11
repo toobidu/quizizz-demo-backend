@@ -1,9 +1,14 @@
+using System.Text.Json.Serialization;
+
 namespace ConsoleApp1.Model.DTO.Users;
 
 public class ChangePasswordRequest
 {
-    public string CurrentPassword { get; set; }
-    public string NewPassword { get; set; }
+    [JsonPropertyName("currentPassword")]
+    public string CurrentPassword { get; set; } = string.Empty;
+    
+    [JsonPropertyName("newPassword")]
+    public string NewPassword { get; set; } = string.Empty;
 
     public bool IsValid()
     {
@@ -12,6 +17,8 @@ public class ChangePasswordRequest
                NewPassword.Length >= 6;
     }
 
+    public ChangePasswordRequest() { }
+    
     public ChangePasswordRequest(string currentPassword, string newPassword) =>
         (CurrentPassword, NewPassword) = (currentPassword, newPassword);
 }

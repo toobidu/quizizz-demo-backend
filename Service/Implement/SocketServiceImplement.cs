@@ -70,7 +70,8 @@ public class SocketServiceImplement : ISocketService
             Username = username,
             UserId = userId,
             SocketId = socketId,
-            IsHost = gameRoom.Players.Count == 0
+            IsHost = gameRoom.Players.Count == 0,
+            JoinTime = DateTime.UtcNow
         };
         
         gameRoom.Players.Add(player);
@@ -90,19 +91,33 @@ public class SocketServiceImplement : ISocketService
         {
             gameRoom.Players.Remove(player);
             
+            // Nếu là host rời phòng
             if (player.IsHost && gameRoom.Players.Count > 0)
             {
-                gameRoom.Players[0].IsHost = true;
+                // Chuyển host cho người join sớm nhất tiếp theo
+                var nextHost = gameRoom.Players.OrderBy(p => p.JoinTime ?? DateTime.MaxValue).First();
+                nextHost.IsHost = true;
+                
+                await BroadcastToRoomAsync(roomCode, "host-changed", new {
+                    newHost = nextHost.Username,
+                    message = $"{nextHost.Username} đã trở thành host mới"
+                });
             }
             
             if (gameRoom.Players.Count == 0)
             {
                 _gameRooms.TryRemove(roomCode, out _);
                 await CleanupGameSessionAsync(roomCode);
+                Console.WriteLine($"[SOCKET] Room {roomCode} deleted - no players left");
             }
             else
             {
                 await UpdateRoomPlayersAsync(roomCode);
+                await BroadcastToRoomAsync(roomCode, "player-left", new {
+                    username = player.Username,
+                    message = $"{player.Username} đã rời phòng",
+                    remainingPlayers = gameRoom.Players.Count
+                });
             }
         }
         
@@ -387,13 +402,14 @@ public class SocketServiceImplement : ISocketService
         });
     }
 
-    public async Task CleanupGameSessionAsync(string roomCode)
+    public Task CleanupGameSessionAsync(string roomCode)
     {
         if (_roomGameSessions.TryRemove(roomCode, out var gameSession))
         {
             gameSession.GameTimer?.Dispose();
             Console.WriteLine($"[SOCKET] Game session cleaned up for room {roomCode}");
         }
+        return Task.CompletedTask;
     }
 
     public async Task UpdateScoreboardAsync(string roomCode, object scoreboard)

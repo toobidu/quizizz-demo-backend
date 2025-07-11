@@ -21,9 +21,9 @@ public class ForgotPasswordRouter : IBaseRouter
         string path = request.Url?.AbsolutePath ?? "";
         string method = request.HttpMethod;
 
-        Console.WriteLine($"[FORGOT_PASSWORD_ROUTER] Handling request: {method} {path}");
-
         if (!path.StartsWith("/api/forgot-password")) return false;
+        
+        Console.WriteLine($"[FORGOT_PASSWORD_ROUTER] Handling request: {method} {path}");
 
         try
         {

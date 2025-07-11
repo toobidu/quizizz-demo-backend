@@ -34,6 +34,15 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
         return result.ToList();
     }
 
+    public async Task<Room?> GetActiveRoomByUserIdAsync(int userId)
+    {
+        const string query = @"SELECT r.* FROM rooms r 
+                               INNER JOIN room_players rp ON r.id = rp.room_id 
+                               WHERE rp.user_id = @UserId AND r.status IN ('waiting', 'active')";
+        using var conn = CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<Room>(query, new { UserId = userId });
+    }
+
     public async Task<int> AddAsync(RoomPlayer roomPlayer)
     {
         const string query = @"INSERT INTO room_players (room_id, user_id, score, time_taken) 

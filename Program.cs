@@ -68,6 +68,8 @@ internal class Program
             roomRepo, roomSettingsRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo);
         IJoinRoomService joinRoomService = new JoinRoomServiceImplement(
             roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService);
+        IRoomManagementService roomManagementService = new RoomManagementServiceImplement(
+            roomRepo, roomPlayerRepo, roomSettingsRepo, userRepo);
         ISocketService socketService = new SocketServiceImplement();
 
         // Khởi tạo Controller:
@@ -80,7 +82,9 @@ internal class Program
         var userProfileController = new UserProfileController(userProfileService, authorizationService);
         var createRoomController = new CreateRoomController(createRoomService, authorizationService);
         var joinRoomController = new JoinRoomController(joinRoomService,authorizationService);
+        var leaveRoomController = new LeaveRoomController(roomManagementService, authorizationService);
         var gameController = new GameController(socketService, joinRoomService);
+        var topicController = new TopicController(topicRepo);
 
         // Khởi tạo Router cho từng Controller:
         var authRouter = new AuthRouter(authController);
@@ -89,15 +93,20 @@ internal class Program
         var roleRouter = new RoleRouter(roleController);
         var permissionRouter = new PermissionRouter(permissionController);
         var userRouter = new UserRouter(userController);
-        var userProfileRouter = new UserProfileRouter(userProfileController);
-        var createRoomRouter = new CreateRoomRouter(createRoomController);
+        var userProfileRouter = new UserProfileRouter(userProfileController, jwtHelper);
+        var createRoomRouter = new CreateRoomRouter(createRoomController, jwtHelper);
         var joinRoomRouter = new JoinRoomRouter(joinRoomController);
+        var leaveRoomRouter = new LeaveRoomRouter(leaveRoomController, jwtHelper);
         var gameRouter = new GameRouter(gameController);
+        var topicRouter = new TopicRouter(topicController);
 
         // Khởi động Socket.IO server
+        Console.WriteLine("[Server] Starting Socket.IO server on port 3001...");
         await socketService.StartAsync(3001);
+        Console.WriteLine("[Server] Socket.IO server started successfully on port 3001");
         
         // Đăng ký tất cả router vào HttpServer
+        Console.WriteLine("[Server] Initializing HTTP server on http://localhost:5000/");
         var server = new HttpServer(
             "http://localhost:5000/",
             authRouter,
@@ -109,9 +118,20 @@ internal class Program
             userProfileRouter,
             createRoomRouter,
             joinRoomRouter,
-            gameRouter
+            leaveRoomRouter,
+            gameRouter,
+            topicRouter
         );
 
+        Console.WriteLine("[Server] Starting HTTP server...");
+        Console.WriteLine("[Server] Available endpoints:");
+        Console.WriteLine("[Server] - GET /api/profile/me (Get current user profile)");
+        Console.WriteLine("[Server] - GET /api/profile/search/{username} (Search user)");
+        Console.WriteLine("[Server] - PUT /api/profile/password (Change password)");
+        Console.WriteLine("[Server] - PUT /api/profile/update (Update profile)");
+        Console.WriteLine("[Server] ===========================================");
+        Console.WriteLine("[Server] IMPORTANT: Frontend should connect to http://localhost:5000, NOT port 8080!");
+        Console.WriteLine("[Server] ===========================================");
         await server.StartAsync();
     }
 }

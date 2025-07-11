@@ -3,7 +3,9 @@ using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Router;
 using ConsoleApp1.Config;
+using ConsoleApp1.Security;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Net;
 using System.Text;
 
@@ -12,10 +14,12 @@ namespace ConsoleApp1.Router;
 public class CreateRoomRouter : IBaseRouter
 {
     private readonly CreateRoomController _controller;
+    private readonly JwtHelper _jwtHelper;
 
-    public CreateRoomRouter(CreateRoomController controller)
+    public CreateRoomRouter(CreateRoomController controller, JwtHelper jwtHelper)
     {
         _controller = controller;
+        _jwtHelper = jwtHelper;
     }
 
     public async Task<bool> HandleAsync(HttpListenerRequest request, HttpListenerResponse response)
@@ -24,6 +28,8 @@ public class CreateRoomRouter : IBaseRouter
         string method = request.HttpMethod;
 
         if (!path.StartsWith("/api/rooms")) return false;
+        
+        Console.WriteLine($"[CREATE_ROOM_ROUTER] Handling request: {method} {path}");
 
         string? token = GetAccessToken(request);
         if (token == null)
@@ -68,6 +74,13 @@ public class CreateRoomRouter : IBaseRouter
 
     private async Task CreateRoom(HttpListenerRequest request, HttpListenerResponse response, string token, string path)
     {
+        var userId = _jwtHelper.GetUserIdFromToken(token);
+        if (userId == null)
+        {
+            HttpResponseHelper.WriteUnauthorized(response, "Token không hợp lệ", path);
+            return;
+        }
+
         var dto = await ParseJson<CreateRoomRequest>(request);
         if (dto == null)
         {
@@ -75,12 +88,19 @@ public class CreateRoomRouter : IBaseRouter
             return;
         }
 
-        var result = await _controller.CreateRoomAsync(dto, 1); // TODO: Get userId from token
+        var result = await _controller.CreateRoomAsync(dto, userId.Value);
         HttpResponseHelper.WriteJsonResponse(response, result);
     }
 
     private async Task UpdateSettings(HttpListenerRequest request, HttpListenerResponse response, string path, string token)
     {
+        var userId = _jwtHelper.GetUserIdFromToken(token);
+        if (userId == null)
+        {
+            HttpResponseHelper.WriteUnauthorized(response, "Token không hợp lệ", path);
+            return;
+        }
+
         var roomId = ExtractRoomId(path);
         if (roomId == 0)
         {
@@ -95,12 +115,19 @@ public class CreateRoomRouter : IBaseRouter
             return;
         }
 
-        var result = await _controller.UpdateRoomSettingsAsync(roomId, settings, 1); // TODO: Get userId from token
+        var result = await _controller.UpdateRoomSettingsAsync(roomId, settings, userId.Value);
         HttpResponseHelper.WriteJsonResponse(response, result);
     }
 
     private async Task KickPlayer(HttpListenerResponse response, string path, string token)
     {
+        var userId = _jwtHelper.GetUserIdFromToken(token);
+        if (userId == null)
+        {
+            HttpResponseHelper.WriteUnauthorized(response, "Token không hợp lệ", path);
+            return;
+        }
+
         var parts = path.Split('/');
         if (parts.Length < 6 || !int.TryParse(parts[3], out int roomId) || !int.TryParse(parts[5], out int playerId))
         {
@@ -108,12 +135,19 @@ public class CreateRoomRouter : IBaseRouter
             return;
         }
 
-        var result = await _controller.KickPlayerAsync(roomId, playerId, 1); // TODO: Get userId from token
+        var result = await _controller.KickPlayerAsync(roomId, playerId, userId.Value);
         HttpResponseHelper.WriteJsonResponse(response, result);
     }
 
     private async Task UpdateStatus(HttpListenerRequest request, HttpListenerResponse response, string path, string token)
     {
+        var userId = _jwtHelper.GetUserIdFromToken(token);
+        if (userId == null)
+        {
+            HttpResponseHelper.WriteUnauthorized(response, "Token không hợp lệ", path);
+            return;
+        }
+
         var roomId = ExtractRoomId(path);
         if (roomId == 0)
         {
@@ -128,12 +162,19 @@ public class CreateRoomRouter : IBaseRouter
             return;
         }
 
-        var result = await _controller.UpdateRoomStatusAsync(roomId, statusRequest["status"], 1); // TODO: Get userId from token
+        var result = await _controller.UpdateRoomStatusAsync(roomId, statusRequest["status"], userId.Value);
         HttpResponseHelper.WriteJsonResponse(response, result);
     }
 
     private async Task DeleteRoom(HttpListenerResponse response, string path, string token)
     {
+        var userId = _jwtHelper.GetUserIdFromToken(token);
+        if (userId == null)
+        {
+            HttpResponseHelper.WriteUnauthorized(response, "Token không hợp lệ", path);
+            return;
+        }
+
         var roomId = ExtractRoomId(path);
         if (roomId == 0)
         {
@@ -141,12 +182,19 @@ public class CreateRoomRouter : IBaseRouter
             return;
         }
 
-        var result = await _controller.DeleteRoomAsync(roomId, 1); // TODO: Get userId from token
+        var result = await _controller.DeleteRoomAsync(roomId, userId.Value);
         HttpResponseHelper.WriteJsonResponse(response, result);
     }
 
     private async Task TransferOwnership(HttpListenerRequest request, HttpListenerResponse response, string path, string token)
     {
+        var userId = _jwtHelper.GetUserIdFromToken(token);
+        if (userId == null)
+        {
+            HttpResponseHelper.WriteUnauthorized(response, "Token không hợp lệ", path);
+            return;
+        }
+
         var roomId = ExtractRoomId(path);
         if (roomId == 0)
         {
@@ -161,7 +209,7 @@ public class CreateRoomRouter : IBaseRouter
             return;
         }
 
-        var result = await _controller.TransferOwnershipAsync(roomId, transferRequest["newOwnerId"], 1); // TODO: Get userId from token
+        var result = await _controller.TransferOwnershipAsync(roomId, transferRequest["newOwnerId"], userId.Value);
         HttpResponseHelper.WriteJsonResponse(response, result);
     }
 
@@ -182,6 +230,13 @@ public class CreateRoomRouter : IBaseRouter
     {
         using var reader = new StreamReader(req.InputStream, Encoding.UTF8);
         var body = await reader.ReadToEndAsync();
-        return JsonSerializer.Deserialize<T>(body);
+        Console.WriteLine($"[CREATE_ROOM_ROUTER] Request body: {body}");
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        var result = JsonSerializer.Deserialize<T>(body, options);
+        Console.WriteLine($"[CREATE_ROOM_ROUTER] Deserialized: {JsonSerializer.Serialize(result, options)}");
+        return result;
     }
 }

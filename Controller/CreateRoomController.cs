@@ -28,7 +28,7 @@ public class CreateRoomController
         if (!request.ValidField())
             return ApiResponse<RoomDTO>.Fail("Thông tin phòng không hợp lệ");
 
-        var room = await _createRoomService.CreateRoomAsync(request);
+        var room = await _createRoomService.CreateRoomAsync(request, userId);
         return ApiResponse<RoomDTO>.Success(room, "Tạo phòng thành công");
     }
 

@@ -11,7 +11,7 @@ public static class UserProfileMapper
         return new UserProfileDTO(
             user.Id, user.Username, user.FullName, user.Email,
             user.PhoneNumber, user.Address, highestRank,
-            fastestTime, highestScore, bestTopic);
+            fastestTime, highestScore, bestTopic, user.CreatedAt);
     }
 
     public static UserDTO ToBasicDTO(User user)

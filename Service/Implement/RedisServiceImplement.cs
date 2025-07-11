@@ -20,10 +20,11 @@ public class RedisServiceImplement : IRedisService
         if (permissions != null && permissions.Any())
         {
             await db.SetAddAsync(key, permissions.Select(p => (RedisValue)p).ToArray());
+            Console.WriteLine($"[REDIS] Đã lưu {permissions.Count()} quyền cho user {userId}");
         }
         else
         {
-            Console.WriteLine($"[WARNING] Không có quyền nào để set vào Redis cho user {userId}");
+            Console.WriteLine($"[WARNING] Không có quyền nào để set vào Redis cho user {userId} không tạo được phòng, hãy kiểm tra lại");
         }
     }
 

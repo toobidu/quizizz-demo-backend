@@ -5,7 +5,7 @@ namespace ConsoleApp1.Service.Interface;
 
 public interface ICreateRoomService
 {
-    Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request);
+    Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request, int userId);
     Task<bool> UpdateRoomSettingsAsync(int roomId, RoomSetting settings);
     Task<bool> KickPlayerAsync(int roomId, int playerId);
     Task<bool> UpdateRoomStatusAsync(int roomId, string status);

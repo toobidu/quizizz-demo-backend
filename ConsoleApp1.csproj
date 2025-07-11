@@ -17,7 +17,7 @@
         <PackageReference Include="SocketIOSharp" Version="2.0.3" />
 
         <!-- Data access -->
-        <PackageReference Include="Npgsql" Version="8.0.2" />
+        <PackageReference Include="Npgsql" Version="9.0.0" />
         <PackageReference Include="Dapper" Version="2.1.28" />
 
         <!-- Security -->

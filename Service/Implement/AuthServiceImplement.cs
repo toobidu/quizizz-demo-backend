@@ -249,7 +249,7 @@ public class AuthServiceImplement : IAuthService
             Console.WriteLine($"[AUTH_SERVICE] SendForgotPasswordOtpAsync called with email: '{email}'");
             Console.WriteLine($"[AUTH_SERVICE] Email trimmed: '{email?.Trim()}'");
             
-            var user = await _userRepo.GetByEmailAsync(email?.Trim());
+            var user = await _userRepo.GetByEmailAsync(email?.Trim() ?? string.Empty);
             Console.WriteLine($"[AUTH_SERVICE] User lookup result: {(user != null ? $"Found user ID {user.Id}" : "User not found")}");
             
             if (user == null)
@@ -270,7 +270,7 @@ public class AuthServiceImplement : IAuthService
             Console.WriteLine($"[AUTH_SERVICE] OTP saved to Redis successfully");
             
             // Gửi OTP qua email
-            bool emailSent = await _emailService.SendOtpEmailAsync(email.Trim(), otpCode);
+            bool emailSent = await _emailService.SendOtpEmailAsync(email?.Trim() ?? string.Empty, otpCode);
             Console.WriteLine($"[AUTH_SERVICE] Email sent result: {emailSent}");
             
             if (!emailSent)

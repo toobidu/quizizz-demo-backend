@@ -13,7 +13,7 @@ public static class DatabaseHelper
 
         IConfiguration config = builder.Build();
 
-        return config.GetConnectionString("DefaultConnection");
+        return config.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
     }
 
     public static NpgsqlConnection GetConnection()
