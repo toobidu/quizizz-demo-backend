@@ -68,7 +68,7 @@ public class UserRepositoryImplement : IUserRepository
         const string query = @"
         INSERT INTO users (username, full_name, email, phone_number, address, password, type_account)
         VALUES (@Username, @FullName, @Email, @PhoneNumber, @Address, @Password, @TypeAccount)
-        RETURNING *";
+        RETURNING id";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, user);
     }

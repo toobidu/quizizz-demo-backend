@@ -28,10 +28,17 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
 
     public async Task<IEnumerable<RoomPlayer>> GetByRoomIdAsync(int roomId)
     {
-        const string query = @"SELECT * FROM room_players WHERE room_id = @RoomId";
+        Console.WriteLine($"[ROOM_PLAYER_REPO] GetByRoomIdAsync called for roomId: {roomId}");
+        const string query = @"SELECT * FROM room_players WHERE room_id = @RoomId ORDER BY created_at ASC";
         using var conn = CreateConnection();
         var result = await conn.QueryAsync<RoomPlayer>(query, new { RoomId = roomId });
-        return result.ToList();
+        var players = result.ToList();
+        Console.WriteLine($"[ROOM_PLAYER_REPO] Found {players.Count} players in room {roomId}");
+        foreach (var player in players)
+        {
+            Console.WriteLine($"[ROOM_PLAYER_REPO] Player - UserId: {player.UserId}, Score: {player.Score}, CreatedAt: {player.CreatedAt}");
+        }
+        return players;
     }
 
     public async Task<Room?> GetActiveRoomByUserIdAsync(int userId)
@@ -45,10 +52,24 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
 
     public async Task<int> AddAsync(RoomPlayer roomPlayer)
     {
-        const string query = @"INSERT INTO room_players (room_id, user_id, score, time_taken) 
-                               VALUES (@RoomId, @UserId, @Score, @TimeTaken) RETURNING id"; 
+        Console.WriteLine($"[ROOM_PLAYER_REPO] Adding player - RoomId: {roomPlayer.RoomId}, UserId: {roomPlayer.UserId}");
+        
+        // Kiểm tra duplicate trước khi thêm
+        var existing = await GetByUserIdAndRoomIdAsync(roomPlayer.UserId, roomPlayer.RoomId);
+        if (existing != null)
+        {
+            Console.WriteLine($"[ROOM_PLAYER_REPO] Player already exists - RoomId: {roomPlayer.RoomId}, UserId: {roomPlayer.UserId}, skipping insert");
+            return 0;
+        }
+        
+        roomPlayer.CreatedAt = DateTime.UtcNow;
+        roomPlayer.UpdatedAt = DateTime.UtcNow;
+        const string query = @"INSERT INTO room_players (room_id, user_id, score, time_taken, created_at, updated_at) 
+                               VALUES (@RoomId, @UserId, @Score, @TimeTaken, @CreatedAt, @UpdatedAt)"; 
         using var conn = CreateConnection();
-        return await conn.ExecuteScalarAsync<int>(query, roomPlayer);
+        await conn.ExecuteAsync(query, roomPlayer);
+        Console.WriteLine($"[ROOM_PLAYER_REPO] Player added successfully - RoomId: {roomPlayer.RoomId}, UserId: {roomPlayer.UserId}");
+        return 1;
     }
 
     public async Task UpdateAsync(RoomPlayer roomPlayer)
@@ -62,10 +83,22 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
 
     public async Task<bool> DeleteByUserIdAndRoomIdAsync(int userId, int roomId)
     {
+        Console.WriteLine($"[ROOM_PLAYER_REPO] Deleting player - RoomId: {roomId}, UserId: {userId}");
+        
+        // Kiểm tra trước khi xóa
+        const string checkQuery = @"SELECT COUNT(*) FROM room_players WHERE user_id = @UserId AND room_id = @RoomId";
+        using var conn = CreateConnection();
+        var existsBefore = await conn.ExecuteScalarAsync<int>(checkQuery, new { UserId = userId, RoomId = roomId });
+        Console.WriteLine($"[ROOM_PLAYER_REPO] Player exists before delete: {existsBefore > 0}");
+        
         const string query = @"DELETE FROM room_players 
                                WHERE user_id = @UserId AND room_id = @RoomId";
-        using var conn = CreateConnection();
         var affected = await conn.ExecuteAsync(query, new { UserId = userId, RoomId = roomId });
+        
+        // Kiểm tra sau khi xóa
+        var existsAfter = await conn.ExecuteScalarAsync<int>(checkQuery, new { UserId = userId, RoomId = roomId });
+        Console.WriteLine($"[ROOM_PLAYER_REPO] Delete result - RoomId: {roomId}, UserId: {userId}, Affected rows: {affected}, Still exists: {existsAfter > 0}");
+        
         return affected > 0;
     }
     

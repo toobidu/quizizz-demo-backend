@@ -8,6 +8,7 @@ public static class RoomMapper
     public static RoomDTO ToDTO(Room room)
     {
         return new RoomDTO(
+            id: room.Id,
             code: room.RoomCode,
             name: room.RoomName,
             isPrivate: room.IsPrivate,
@@ -32,14 +33,18 @@ public static class RoomMapper
         );
     }
 
-    public static RoomSummaryDTO ToSummaryDTO(Room room, int playerCount)
+    public static RoomSummaryDTO ToSummaryDTO(Room room, int playerCount, string? topicName = null, int questionCount = 0, int countdownTime = 0)
     {
         return new RoomSummaryDTO(
             roomCode: room.RoomCode,
             roomName: room.RoomName,
             isPrivate: room.IsPrivate,
             playerCount: playerCount,
-            status: room.Status
+            maxPlayers: room.MaxPlayers,
+            status: room.Status,
+            topicName: topicName,
+            questionCount: questionCount,
+            countdownTime: countdownTime
         );
     }
 }

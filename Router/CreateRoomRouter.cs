@@ -60,6 +60,8 @@ public class CreateRoomRouter : IBaseRouter
                 case "PUT" when path.StartsWith("/api/rooms/") && path.EndsWith("/transfer"):
                     await TransferOwnership(request, response, path, token);
                     return true;
+                case "GET" when path == "/api/rooms/all":
+                    return false; 
                 default:
                     HttpResponseHelper.WriteNotFound(response, "Endpoint không tồn tại", path);
                     return true;

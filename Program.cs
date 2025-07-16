@@ -7,7 +7,9 @@ using ConsoleApp1.Router;
 using ConsoleApp1.Security;
 using ConsoleApp1.Service;
 using ConsoleApp1.Service.Implement;
+using ConsoleApp1.Service.Implement.Socket;
 using ConsoleApp1.Service.Interface;
+using ConsoleApp1.Service.Interface.Socket;
 using ConsoleApp1.Repository.Interface;
 
 internal class Program
@@ -64,13 +66,29 @@ internal class Program
         IPermissionService permissionService = new PermissionServiceImplement(permissionRepo);
         IUserService userService = new UserServiceImplement(userRepo, userRoleRepo, roleRepo);
         IUserProfileService userProfileService = new UserProfileServiceImplement(userRepo, userAnswerRepo, rankRepo, topicRepo);
+        // Khởi tạo các WebSocket service con
+        ISocketConnectionService socketConnectionService = new SocketConnectionServiceImplement();
+        IRoomManagementSocketService roomManagementSocketService = new RoomManagementSocketServiceImplement();
+        IGameFlowSocketService gameFlowSocketService = new GameFlowSocketServiceImplement();
+        IPlayerInteractionSocketService playerInteractionSocketService = new PlayerInteractionSocketServiceImplement();
+        IScoringSocketService scoringSocketService = new ScoringSocketServiceImplement();
+        IHostControlSocketService hostControlSocketService = new HostControlSocketServiceImplement();
+        
+        // Khởi tạo composite SocketService với tất cả dependency
+        ISocketService socketService = new SocketServiceImplement(
+            socketConnectionService,
+            roomManagementSocketService,
+            gameFlowSocketService,
+            playerInteractionSocketService,
+            scoringSocketService,
+            hostControlSocketService
+        );
         ICreateRoomService createRoomService = new CreateRoomServiceImplement(
             roomRepo, roomSettingsRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo);
         IJoinRoomService joinRoomService = new JoinRoomServiceImplement(
-            roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService);
+            roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService, socketService);
         IRoomManagementService roomManagementService = new RoomManagementServiceImplement(
             roomRepo, roomPlayerRepo, roomSettingsRepo, userRepo);
-        ISocketService socketService = new SocketServiceImplement();
 
         // Khởi tạo Controller:
         var authController = new AuthController(authService, jwtHelper);
@@ -82,7 +100,7 @@ internal class Program
         var userProfileController = new UserProfileController(userProfileService, authorizationService);
         var createRoomController = new CreateRoomController(createRoomService, authorizationService);
         var joinRoomController = new JoinRoomController(joinRoomService,authorizationService);
-        var leaveRoomController = new LeaveRoomController(roomManagementService, authorizationService);
+        var leaveRoomController = new LeaveRoomController(joinRoomService, authorizationService);
         var gameController = new GameController(socketService, joinRoomService);
         var topicController = new TopicController(topicRepo);
 
@@ -95,18 +113,18 @@ internal class Program
         var userRouter = new UserRouter(userController);
         var userProfileRouter = new UserProfileRouter(userProfileController, jwtHelper);
         var createRoomRouter = new CreateRoomRouter(createRoomController, jwtHelper);
-        var joinRoomRouter = new JoinRoomRouter(joinRoomController);
+        var joinRoomRouter = new JoinRoomRouter(joinRoomController, jwtHelper);
         var leaveRoomRouter = new LeaveRoomRouter(leaveRoomController, jwtHelper);
         var gameRouter = new GameRouter(gameController);
         var topicRouter = new TopicRouter(topicController);
 
         // Khởi động Socket.IO server
-        Console.WriteLine("[Server] Starting Socket.IO server on port 3001...");
+        Console.WriteLine("[Máy chủ] Đang khởi động máy chủ Socket.IO trên cổng 3001...");
         await socketService.StartAsync(3001);
-        Console.WriteLine("[Server] Socket.IO server started successfully on port 3001");
+        Console.WriteLine("[Máy chủ] Máy chủ Socket.IO đã khởi động thành công trên cổng 3001");
         
         // Đăng ký tất cả router vào HttpServer
-        Console.WriteLine("[Server] Initializing HTTP server on http://localhost:5000/");
+        Console.WriteLine("[Máy chủ] Đang khởi tạo máy chủ HTTP tại http://localhost:5000/");
         var server = new HttpServer(
             "http://localhost:5000/",
             authRouter,
@@ -116,22 +134,22 @@ internal class Program
             permissionRouter,
             userRouter,
             userProfileRouter,
-            createRoomRouter,
             joinRoomRouter,
+            createRoomRouter,
             leaveRoomRouter,
             gameRouter,
             topicRouter
         );
 
-        Console.WriteLine("[Server] Starting HTTP server...");
-        Console.WriteLine("[Server] Available endpoints:");
-        Console.WriteLine("[Server] - GET /api/profile/me (Get current user profile)");
-        Console.WriteLine("[Server] - GET /api/profile/search/{username} (Search user)");
-        Console.WriteLine("[Server] - PUT /api/profile/password (Change password)");
-        Console.WriteLine("[Server] - PUT /api/profile/update (Update profile)");
-        Console.WriteLine("[Server] ===========================================");
-        Console.WriteLine("[Server] IMPORTANT: Frontend should connect to http://localhost:5000, NOT port 8080!");
-        Console.WriteLine("[Server] ===========================================");
+        Console.WriteLine("[Máy chủ] Đang khởi động máy chủ HTTP...");
+        Console.WriteLine("[Máy chủ] Các endpoint có sẵn:");
+        Console.WriteLine("[Máy chủ] - GET /api/profile/me (Lấy thông tin người dùng hiện tại)");
+        Console.WriteLine("[Máy chủ] - GET /api/profile/search/{username} (Tìm kiếm người dùng)");
+        Console.WriteLine("[Máy chủ] - PUT /api/profile/password (Đổi mật khẩu)");
+        Console.WriteLine("[Máy chủ] - PUT /api/profile/update (Cập nhật thông tin)");
+        Console.WriteLine("[Máy chủ] ===========================================");
+        Console.WriteLine("[Máy chủ] QUAN TRỌNG: Frontend nên kết nối đến http://localhost:5000, KHÔNG phải cổng 8080!");
+        Console.WriteLine("[Máy chủ] ===========================================");
         await server.StartAsync();
     }
 }

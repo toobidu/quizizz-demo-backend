@@ -4,15 +4,22 @@ namespace ConsoleApp1.Model.DTO.Rooms;
 
 public class CreateRoomRequest
 {
-    [JsonPropertyName("roomName")]
-    public string Name { get; set; }
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+    
+    [JsonPropertyName("isPrivate")]
     public bool IsPrivate { get; set; }
-    public int MaxPlayers { get; set; }
-    public string GameMode { get; set; } = "battle";
-    public int? TopicId { get; set; }
-    public int? QuestionCount { get; set; }
-    public int? CountdownSeconds { get; set; }
-
+    
+    [JsonPropertyName("settings")]
+    public RoomSettings Settings { get; set; } = new();
+    
+    // Computed properties for backward compatibility
+    public int MaxPlayers => Settings?.MaxPlayers ?? 0;
+    public string GameMode => Settings?.GameMode ?? "battle";
+    public int? TopicId => Settings?.TopicId ?? 1; // Lấy trực tiếp từ Settings
+    public int? QuestionCount => Settings?.QuestionCount;
+    public int? CountdownSeconds => Settings?.TimeLimit;
+    
     public bool ValidField()
     {
         Console.WriteLine($"[VALIDATION] Name: '{Name}', MaxPlayers: {MaxPlayers}, GameMode: '{GameMode}', TopicId: {TopicId}, QuestionCount: {QuestionCount}, CountdownSeconds: {CountdownSeconds}");
@@ -23,9 +30,9 @@ public class CreateRoomRequest
             return false;
         }
         
-        if (string.IsNullOrWhiteSpace(GameMode))
+        if (string.IsNullOrWhiteSpace(GameMode) && Settings != null)
         {
-            GameMode = MaxPlayers == 2 ? "1vs1" : "battle";
+            Settings.GameMode = MaxPlayers == 2 ? "1vs1" : "battle";
         }
         
         if (GameMode == "1vs1" && MaxPlayers != 2)
@@ -57,6 +64,37 @@ public class CreateRoomRequest
         return isValid;
     }
 
-    public CreateRoomRequest(string name, bool isPrivate, int maxPlayers, string gameMode = "battle") =>
-        (Name, IsPrivate, MaxPlayers, GameMode) = (name, isPrivate, maxPlayers, gameMode);
+    public CreateRoomRequest() { }
+    
+    public CreateRoomRequest(string name, bool isPrivate, int maxPlayers, string gameMode = "battle")
+    {
+        Name = name;
+        IsPrivate = isPrivate;
+        Settings = new RoomSettings
+        {
+            MaxPlayers = maxPlayers,
+            GameMode = gameMode
+        };
+    }
+}
+
+public class RoomSettings
+{
+    [JsonPropertyName("maxPlayers")]
+    public int MaxPlayers { get; set; }
+    
+    [JsonPropertyName("timeLimit")]
+    public int TimeLimit { get; set; }
+    
+    [JsonPropertyName("questionCount")]
+    public int QuestionCount { get; set; }
+    
+    [JsonPropertyName("topic")]
+    public string Topic { get; set; } = string.Empty;
+    
+    [JsonPropertyName("topicId")]
+    public int? TopicId { get; set; }
+    
+    [JsonPropertyName("gameMode")]
+    public string GameMode { get; set; } = "battle";
 }

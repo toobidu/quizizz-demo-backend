@@ -6,6 +6,8 @@
     public string? ErrorCode { get; set; }
     public string? Path { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    
+    public bool IsSuccess => Status >= 200 && Status < 300;
 
     public ApiResponse(int status, string message, T? data, string? errorCode, string? path)
     {

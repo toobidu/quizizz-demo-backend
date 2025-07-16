@@ -5,12 +5,12 @@ namespace ConsoleApp1.Controller;
 
 public class LeaveRoomController
 {
-    private readonly IRoomManagementService _roomManagementService;
+    private readonly IJoinRoomService _joinRoomService; // Sử dụng JoinRoomService thay vì RoomManagementService
     private readonly IAuthorizationService _authorizationService;
 
-    public LeaveRoomController(IRoomManagementService roomManagementService, IAuthorizationService authorizationService)
+    public LeaveRoomController(IJoinRoomService joinRoomService, IAuthorizationService authorizationService)
     {
-        _roomManagementService = roomManagementService;
+        _joinRoomService = joinRoomService;
         _authorizationService = authorizationService;
     }
 
@@ -19,7 +19,8 @@ public class LeaveRoomController
         if (!await _authorizationService.HasPermissionAsync(userId, "room.leave"))
             return ApiResponse<bool>.Fail("Không có quyền rời phòng");
 
-        var result = await _roomManagementService.LeaveRoomAsync(userId, roomId);
+        // Sử dụng JoinRoomService vì nó có logic đầy đủ cho việc rời phòng
+        var result = await _joinRoomService.LeaveRoomAsync(roomId, userId);
         return result 
             ? ApiResponse<bool>.Success(true, "Rời phòng thành công")
             : ApiResponse<bool>.Fail("Không thể rời phòng");

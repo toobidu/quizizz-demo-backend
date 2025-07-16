@@ -14,6 +14,7 @@ public class JoinRoomServiceImplement : IJoinRoomService
     private readonly IUserRoleRepository _userRoleRepository;
     private readonly IRoleRepository _roleRepository;
     private readonly ICreateRoomService _createRoomService;
+    private readonly ISocketService _socketService;
 
     public JoinRoomServiceImplement(
         IRoomRepository roomRepository,
@@ -21,7 +22,8 @@ public class JoinRoomServiceImplement : IJoinRoomService
         IUserRepository userRepository,
         IUserRoleRepository userRoleRepository,
         IRoleRepository roleRepository,
-        ICreateRoomService createRoomService)
+        ICreateRoomService createRoomService,
+        ISocketService socketService)
     {
         _roomRepository = roomRepository;
         _roomPlayerRepository = roomPlayerRepository;
@@ -29,75 +31,232 @@ public class JoinRoomServiceImplement : IJoinRoomService
         _userRoleRepository = userRoleRepository;
         _roleRepository = roleRepository;
         _createRoomService = createRoomService;
+        _socketService = socketService;
     }
 
     public async Task<RoomDTO?> JoinPublicRoomAsync(int roomId, int playerId)
     {
+        Console.WriteLine($"[Dịch vụ-ThamGiaPhòng] JoinPublicRoomAsync được gọi - roomId: {roomId}, playerId: {playerId}");
+        
         var room = await _roomRepository.GetByIdAsync(roomId);
-        if (room == null || room.IsPrivate || room.Status != "waiting") return null;
+        if (room == null)
+        {
+            Console.WriteLine($"[Dịch vụ-ThamGiaPhòng] Không tìm thấy phòng {roomId}");
+            return null;
+        }
+        
+        Console.WriteLine($"[Dịch vụ-ThamGiaPhòng] Tìm thấy phòng - Tên: {room.RoomName}, Riêng tư: {room.IsPrivate}, Trạng thái: {room.Status}");
+        
+        if (room.IsPrivate || room.Status != "waiting")
+        {
+            Console.WriteLine($"[JoinRoomService] Cannot join room - IsPrivate: {room.IsPrivate}, Status: {room.Status}");
+            return null;
+        }
 
         var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
+        Console.WriteLine($"[JoinRoomService] Current player count: {playerCount}/{room.MaxPlayers}");
+        
         if (playerCount >= room.MaxPlayers)
         {
+            Console.WriteLine($"[JoinRoomService] Room is full, updating status");
             await _roomRepository.UpdateStatusAsync(roomId, "full");
             return null;
         }
 
+        var existingPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(playerId, roomId);
+        if (existingPlayer != null)
+        {
+            Console.WriteLine($"[JoinRoomService] Player {playerId} already in room {roomId}");
+            return RoomMapper.ToDTO(room);
+        }
+        
+        var activeRoom = await _roomPlayerRepository.GetActiveRoomByUserIdAsync(playerId);
+        if (activeRoom != null)
+        {
+            Console.WriteLine($"[JoinRoomService] Player {playerId} is in another room {activeRoom.RoomCode}, removing them first");
+            await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, activeRoom.Id);
+        }
+
+        Console.WriteLine($"[JoinRoomService] Adding player {playerId} to room {roomId}");
         var roomPlayer = new RoomPlayer(roomId, playerId, 0, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow);
         await _roomPlayerRepository.AddAsync(roomPlayer);
 
         var newPlayerCount = playerCount + 1;
+        Console.WriteLine($"[JoinRoomService] New player count: {newPlayerCount}");
+        
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         if (newPlayerCount >= room.MaxPlayers)
         {
-            await _roomRepository.UpdateStatusAsync(roomId, "full");
+            Console.WriteLine($"[{timestamp}] 🔄 ROOM STATUS CHANGED - Room {room.RoomCode}: waiting → ready (FULL)");
+            room = await _roomRepository.UpdateStatusAsync(roomId, "ready");
         }
 
+        var finalPlayerCount = await _roomRepository.GetPlayerCountAsync(roomId);
+        Console.WriteLine($"[{timestamp}] ✅ PLAYER JOINED - Room {room.RoomCode} (ID: {roomId}): Player {playerId} joined successfully");
+        Console.WriteLine($"[{timestamp}] 📊 WAITING ROOM STATUS - Room {room.RoomCode}: {finalPlayerCount}/{room.MaxPlayers} players | Status: {room.Status}");
+        
+        // Broadcast WebSocket update
+        try
+        {
+            await _socketService.UpdateRoomPlayersAsync(room.RoomCode);
+            Console.WriteLine($"[{timestamp}] 📡 WEBSOCKET BROADCAST - Room {room.RoomCode}: Player join broadcasted");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{timestamp}] ⚠️ WEBSOCKET ERROR - Room {room.RoomCode}: {ex.Message}");
+        }
+        
         return RoomMapper.ToDTO(room);
     }
 
     public async Task<RoomDTO?> JoinPrivateRoomAsync(string roomCode, int playerId)
     {
+        Console.WriteLine($"[JoinRoomService] JoinPrivateRoomAsync called - roomCode: {roomCode}, playerId: {playerId}");
+        
         var room = await _roomRepository.GetByCodeAsync(roomCode);
-        if (room == null || !room.IsPrivate || room.Status != "waiting") return null;
+        if (room == null)
+        {
+            Console.WriteLine($"[JoinRoomService] Room {roomCode} not found");
+            return null;
+        }
+        
+        Console.WriteLine($"[JoinRoomService] Room found - Name: {room.RoomName}, IsPrivate: {room.IsPrivate}, Status: {room.Status}");
+        
+        if (room.Status != "waiting")
+        {
+            Console.WriteLine($"[JoinRoomService] Cannot join room - Status: {room.Status} (must be 'waiting')");
+            return null;
+        }
 
         var playerCount = await _roomRepository.GetPlayerCountAsync(room.Id);
+        Console.WriteLine($"[JoinRoomService] Current player count: {playerCount}/{room.MaxPlayers}");
+        
         if (playerCount >= room.MaxPlayers)
         {
+            Console.WriteLine($"[JoinRoomService] Room is full, updating status");
             await _roomRepository.UpdateStatusAsync(room.Id, "full");
             return null;
         }
 
+        var existingPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(playerId, room.Id);
+        if (existingPlayer != null)
+        {
+            Console.WriteLine($"[JoinRoomService] Player {playerId} already in room {room.RoomCode}");
+            return RoomMapper.ToDTO(room);
+        }
+        
+        var activeRoom = await _roomPlayerRepository.GetActiveRoomByUserIdAsync(playerId);
+        if (activeRoom != null)
+        {
+            Console.WriteLine($"[JoinRoomService] Player {playerId} is in another room {activeRoom.RoomCode}, removing them first");
+            await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, activeRoom.Id);
+        }
+
+        Console.WriteLine($"[JoinRoomService] Adding player {playerId} to room {room.RoomCode}");
         var roomPlayer = new RoomPlayer(room.Id, playerId, 0, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow);
         await _roomPlayerRepository.AddAsync(roomPlayer);
 
         var newPlayerCount = playerCount + 1;
+        Console.WriteLine($"[JoinRoomService] New player count: {newPlayerCount}");
+        
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         if (newPlayerCount >= room.MaxPlayers)
         {
-            await _roomRepository.UpdateStatusAsync(room.Id, "full");
+            Console.WriteLine($"[{timestamp}] 🔄 ROOM STATUS CHANGED - Room {room.RoomCode}: waiting → ready (FULL)");
+            room = await _roomRepository.UpdateStatusAsync(room.Id, "ready");
         }
 
+        var finalPlayerCount = await _roomRepository.GetPlayerCountAsync(room.Id);
+        Console.WriteLine($"[{timestamp}] ✅ PLAYER JOINED - Room {room.RoomCode} (ID: {room.Id}): Player {playerId} joined successfully");
+        Console.WriteLine($"[{timestamp}] 📊 WAITING ROOM STATUS - Room {room.RoomCode}: {finalPlayerCount}/{room.MaxPlayers} players | Status: {room.Status}");
+        
+        // Broadcast WebSocket update
+        try
+        {
+            await _socketService.UpdateRoomPlayersAsync(room.RoomCode);
+            Console.WriteLine($"[{timestamp}] 📡 WEBSOCKET BROADCAST - Room {room.RoomCode}: Player join broadcasted");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{timestamp}] ⚠️ WEBSOCKET ERROR - Room {room.RoomCode}: {ex.Message}");
+        }
+        
         return RoomMapper.ToDTO(room);
     }
 
     public async Task<bool> LeaveRoomAsync(int roomId, int playerId)
     {
         var room = await _roomRepository.GetByIdAsync(roomId);
-        if (room == null || (room.Status != "waiting" && room.Status != "full")) return false;
+        if (room == null) return false;
 
-        await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, roomId);
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        Console.WriteLine($"[{timestamp}] ❌ PLAYER LEAVING - Room {room.RoomCode} (ID: {roomId}): Player {playerId} attempting to leave");
+        
+        // Xóa player khỏi room_players TRƯỚC
+        var deleteResult = await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, roomId);
+        if (!deleteResult)
+        {
+            Console.WriteLine($"[{timestamp}] ⚠️ PLAYER NOT IN ROOM - Player {playerId} was not in room {roomId}");
+            return false;
+        }
+        
+        var playerCountAfter = await _roomRepository.GetPlayerCountAsync(roomId);
+        Console.WriteLine($"[{timestamp}] 📊 PLAYER LEFT - Room {room.RoomCode}: {playerCountAfter}/{room.MaxPlayers} players remaining");
 
-        var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
-        if (playerCount < room.MaxPlayers && room.Status == "full")
+        // Cập nhật status nếu cần
+        if (playerCountAfter < room.MaxPlayers && (room.Status == "full" || room.Status == "ready"))
         {
             await _roomRepository.UpdateStatusAsync(roomId, "waiting");
+            Console.WriteLine($"[{timestamp}] 🔄 ROOM STATUS CHANGED - Room {room.RoomCode}: full/ready → waiting");
         }
 
+        // Xử lý owner rời phòng SAU KHI đã xóa khỏi room_players
         if (room.OwnerId == playerId)
         {
-            await TransferOwnershipOrDeleteRoomAsync(roomId);
+            Console.WriteLine($"[{timestamp}] 👑 OWNER LEFT - Room {room.RoomCode}: Checking remaining players");
+            
+            if (playerCountAfter == 0)
+            {
+                Console.WriteLine($"[{timestamp}] 🗑️ ROOM DELETED - Room {room.RoomCode} (ID: {roomId}): No players remaining");
+                await _createRoomService.DeleteRoomAsync(roomId);
+            }
+            else
+            {
+                // Chuyển quyền owner cho người chơi đầu tiên còn lại
+                var remainingPlayers = await _roomPlayerRepository.GetByRoomIdAsync(roomId);
+                if (remainingPlayers.Any())
+                {
+                    var nextOwner = remainingPlayers.OrderBy(p => p.CreatedAt).First();
+                    Console.WriteLine($"[{timestamp}] 🔄 OWNERSHIP TRANSFERRED - Room {room.RoomCode}: New owner is Player {nextOwner.UserId}");
+                    await _createRoomService.TransferOwnershipAsync(roomId, nextOwner.UserId);
+                }
+            }
+        }
+        
+        // Broadcast WebSocket update
+        try
+        {
+            var roomForBroadcast = await _roomRepository.GetByIdAsync(roomId);
+            if (roomForBroadcast != null)
+            {
+                await _socketService.UpdateRoomPlayersAsync(roomForBroadcast.RoomCode);
+                Console.WriteLine($"[{timestamp}] 📡 WEBSOCKET BROADCAST - Room {roomForBroadcast.RoomCode}: Player leave broadcasted");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{timestamp}] ⚠️ WEBSOCKET ERROR - Leave broadcast: {ex.Message}");
         }
 
         return true;
+    }
+
+    public async Task<bool> LeaveRoomByCodeAsync(string roomCode, int playerId)
+    {
+        var room = await _roomRepository.GetByCodeAsync(roomCode);
+        if (room == null) return false;
+        
+        return await LeaveRoomAsync(room.Id, playerId);
     }
 
     public async Task<RoomDTO?> GetRoomByCodeAsync(string roomCode)
@@ -114,41 +273,121 @@ public class JoinRoomServiceImplement : IJoinRoomService
         foreach (var room in rooms)
         {
             var playerCount = await _roomRepository.GetPlayerCountAsync(room.Id);
-            result.Add(RoomMapper.ToSummaryDTO(room, playerCount));
+            var topicName = await _roomRepository.GetRoomTopicNameAsync(room.Id);
+            var questionCount = await _roomRepository.GetRoomQuestionCountAsync(room.Id);
+            var countdownTime = await _roomRepository.GetRoomCountdownTimeAsync(room.Id);
+            
+            result.Add(new RoomSummaryDTO(room.RoomCode, room.RoomName, room.IsPrivate, 
+                playerCount, room.MaxPlayers, room.Status, topicName, questionCount, countdownTime));
         }
         
+        return result;
+    }
+
+    public async Task<IEnumerable<RoomSummaryDTO>> GetAllRoomsAsync()
+    {
+        Console.WriteLine("[JoinRoomService] GetAllRoomsAsync called");
+        
+        var rooms = await _roomRepository.GetAllRoomsWithDetailsAsync();
+        Console.WriteLine($"[JoinRoomService] Repository returned {rooms?.Count() ?? 0} rooms");
+        
+        if (rooms == null)
+        {
+            Console.WriteLine("[JoinRoomService] Repository returned null, returning empty list");
+            return new List<RoomSummaryDTO>();
+        }
+        
+        var result = new List<RoomSummaryDTO>();
+        foreach (var room in rooms)
+        {
+            Console.WriteLine($"[JoinRoomService] Processing room: Id={room.Id}, Name={room.RoomName}, Code={room.RoomCode}");
+            
+            var playerCount = await _roomRepository.GetPlayerCountAsync(room.Id);
+            var topicName = await _roomRepository.GetRoomTopicNameAsync(room.Id);
+            var questionCount = await _roomRepository.GetRoomQuestionCountAsync(room.Id);
+            var countdownTime = await _roomRepository.GetRoomCountdownTimeAsync(room.Id);
+            
+            Console.WriteLine($"[JoinRoomService] Room details - Players: {playerCount}/{room.MaxPlayers}, Topic: {topicName}, Questions: {questionCount}");
+            
+            result.Add(new RoomSummaryDTO(room.RoomCode, room.RoomName, room.IsPrivate, 
+                playerCount, room.MaxPlayers, room.Status, topicName, questionCount, countdownTime));
+        }
+        
+        Console.WriteLine($"[JoinRoomService] Returning {result.Count} room summaries");
         return result;
     }
 
     public async Task<IEnumerable<PlayerInRoomDTO>> GetPlayersInRoomAsync(int roomId)
     {
+        Console.WriteLine($"[JoinRoomService] GetPlayersInRoomAsync called for roomId: {roomId}");
+        
         var roomPlayers = await _roomPlayerRepository.GetByRoomIdAsync(roomId);
+        Console.WriteLine($"[JoinRoomService] Found {roomPlayers?.Count() ?? 0} players in room {roomId}");
+        
         var result = new List<PlayerInRoomDTO>();
 
         foreach (var rp in roomPlayers)
         {
+            Console.WriteLine($"[JoinRoomService] Processing player - UserId: {rp.UserId}, Score: {rp.Score}");
             var user = await _userRepository.GetByIdAsync(rp.UserId);
             if (user != null)
             {
+                Console.WriteLine($"[JoinRoomService] User found - Id: {user.Id}, Username: {user.Username}");
                 result.Add(new PlayerInRoomDTO(user.Id, user.Username, rp.Score, rp.TimeTaken));
+            }
+            else
+            {
+                Console.WriteLine($"[JoinRoomService] User not found for UserId: {rp.UserId}");
             }
         }
 
+        Console.WriteLine($"[JoinRoomService] Returning {result.Count} players for room {roomId}");
         return result;
     }
 
-    private async Task TransferOwnershipOrDeleteRoomAsync(int roomId)
+    public async Task<RoomDetailsDTO?> GetRoomDetailsAsync(int roomId)
     {
-        var remainingPlayers = await _roomPlayerRepository.GetByRoomIdAsync(roomId);
-        
-        if (!remainingPlayers.Any())
+        var room = await _roomRepository.GetByIdAsync(roomId);
+        if (room == null) return null;
+
+        var owner = await _userRepository.GetByIdAsync(room.OwnerId);
+        var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
+        var topicName = await _roomRepository.GetRoomTopicNameAsync(roomId);
+        var questionCount = await _roomRepository.GetRoomQuestionCountAsync(roomId);
+        var countdownTime = await _roomRepository.GetRoomCountdownTimeAsync(roomId);
+        var players = await GetPlayersInRoomAsync(roomId);
+
+        return new RoomDetailsDTO
         {
-            await _createRoomService.DeleteRoomAsync(roomId);
-        }
-        else
-        {
-            var nextOwner = remainingPlayers.OrderBy(p => p.CreatedAt).First();
-            await _createRoomService.TransferOwnershipAsync(roomId, nextOwner.UserId);
-        }
+            Id = room.Id,
+            RoomCode = room.RoomCode,
+            RoomName = room.RoomName,
+            IsPrivate = room.IsPrivate,
+            OwnerId = room.OwnerId,
+            OwnerUsername = owner?.Username ?? "Unknown",
+            Status = room.Status,
+            MaxPlayers = room.MaxPlayers,
+            CurrentPlayerCount = playerCount,
+            TopicName = topicName ?? "Kiến thức chung",
+            QuestionCount = questionCount,
+            CountdownTime = countdownTime,
+            GameMode = "battle", // Default, có thể lấy từ room_settings
+            CreatedAt = room.CreatedAt,
+            Players = players.ToList()
+        };
     }
+
+    public async Task<bool> StartGameAsync(int roomId, int userId)
+    {
+        var room = await _roomRepository.GetByIdAsync(roomId);
+        if (room == null || room.OwnerId != userId || room.Status != "waiting") return false;
+
+        var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
+        if (playerCount < 2) return false; // Cần ít nhất 2 người chơi
+
+        await _roomRepository.UpdateStatusAsync(roomId, "active");
+        return true;
+    }
+
+
 }

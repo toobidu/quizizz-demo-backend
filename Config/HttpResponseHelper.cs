@@ -17,10 +17,9 @@ public static class HttpResponseHelper
 
     public static void SetCorsHeaders(HttpListenerResponse response)
     {
-        response.Headers.Add("Access-Control-Allow-Origin", "http://localhost:5173");
+        response.Headers.Add("Access-Control-Allow-Origin", "*");
         response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        response.Headers.Add("Access-Control-Allow-Credentials", "true");
+        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
     }
 
     public static void WriteOptionsResponse(HttpListenerResponse response)

@@ -41,7 +41,8 @@ public class CreateRoomServiceImplement : ICreateRoomService
         var existingRoom = await _roomPlayerRepository.GetActiveRoomByUserIdAsync(userId);
         if (existingRoom != null)
         {
-            throw new InvalidOperationException($"Bạn đang ở trong phòng {existingRoom.RoomCode}. Vui lòng rời phòng trước khi tạo phòng mới.");
+            Console.WriteLine($"[CREATE_ROOM_SERVICE] User {userId} is still in room {existingRoom.RoomCode}, removing them first");
+            await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(userId, existingRoom.Id);
         }
         
         var roomCode = await GenerateUniqueRoomCodeAsync();
@@ -64,19 +65,57 @@ public class CreateRoomServiceImplement : ICreateRoomService
         await SetupRoomSettingsAsync(roomId, request);
         await UpdateUserTypeAccountAsync(room.OwnerId);
         
-        // Tự động thêm owner vào phòng như một player
-        var roomPlayer = new RoomPlayer
+        // Kiểm tra xem owner đã ở trong phòng chưa (tránh duplicate)
+        var existingPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
+        if (existingPlayer == null)
         {
-            RoomId = roomId,
-            UserId = userId,
-            Score = 0,
-            TimeTaken = TimeSpan.Zero,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-        await _roomPlayerRepository.AddAsync(roomPlayer);
+            Console.WriteLine($"[CREATE_ROOM_SERVICE] Adding owner {userId} to room {roomId} as player");
+            // Tự động thêm owner vào phòng như một player
+            var roomPlayer = new RoomPlayer
+            {
+                RoomId = roomId,
+                UserId = userId,
+                Score = 0,
+                TimeTaken = TimeSpan.Zero,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            var addResult = await _roomPlayerRepository.AddAsync(roomPlayer);
+            Console.WriteLine($"[CREATE_ROOM_SERVICE] Owner {userId} add result: {addResult} (1=success, 0=failed/duplicate)");
+            
+            // Xác nhận lại bằng cách query
+            var confirmPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
+            if (confirmPlayer != null)
+            {
+                Console.WriteLine($"[CREATE_ROOM_SERVICE] CONFIRMED: Owner {userId} exists in room {roomId}");
+            }
+            else
+            {
+                Console.WriteLine($"[CREATE_ROOM_SERVICE] ERROR: Owner {userId} NOT found in room {roomId} after insert!");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[CREATE_ROOM_SERVICE] Owner {userId} already exists in room {roomId}, skipping add");
+        }
         
-        Console.WriteLine($"[CREATE_ROOM_SERVICE] Room {roomCode} created successfully with owner {userId}");
+        // Kiểm tra số lượng player trong phòng sau khi tạo
+        var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        Console.WriteLine($"[{timestamp}] 🏠 ROOM CREATED - Room {roomCode} (ID: {roomId}): {playerCount} players | Status: waiting | Owner/Host: {userId}");
+        Console.WriteLine($"[{timestamp}] 📊 WAITING ROOM STATUS - Room {roomCode}: {playerCount}/{request.MaxPlayers} players | Host: {userId}");
+        Console.WriteLine($"[{timestamp}] 👑 HOST ASSIGNED - Room {roomCode}: User {userId} is the room owner and host");
+        
+        // Debug: Kiểm tra trực tiếp database sau khi tạo phòng
+        try
+        {
+            var connectionString = "Host=localhost;Database=quizizz;Username=postgres;Password=123456";
+            await DebugHelper.CheckRoomPlayersInDatabase(connectionString, roomId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CREATE_ROOM_SERVICE] Debug error: {ex.Message}");
+        }
         return RoomMapper.ToDTO(room);
     }
 

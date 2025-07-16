@@ -33,12 +33,23 @@ public class HttpServer
         var request = context.Request;
         var response = context.Response;
         
+        // Set CORS headers for all requests
+        SetCorsHeaders(response);
+        
         string path = request.Url?.AbsolutePath ?? "unknown";
         string method = request.HttpMethod;
         string clientIP = request.RemoteEndPoint?.Address?.ToString() ?? "unknown";
         
         Console.WriteLine($"[HttpServer] Incoming request: {method} {path} from {clientIP}");
-        Console.WriteLine($"[HttpServer] Headers: {string.Join(", ", request.Headers.AllKeys.Select(k => $"{k}={request.Headers[k]}"))}");
+        
+        // Handle OPTIONS preflight requests
+        if (method == "OPTIONS")
+        {
+            Console.WriteLine($"[HttpServer] Handling OPTIONS preflight for {path}");
+            response.StatusCode = 200;
+            response.OutputStream.Close();
+            return;
+        }
 
         try
         {
@@ -58,7 +69,6 @@ public class HttpServer
             if (!routeFound)
             {
                 Console.WriteLine($"[HttpServer] No router found for {method} {path}");
-                SetCorsHeaders(response);
                 response.StatusCode = 404;
                 await WriteJson(response, new { error = "404 Not Found", path = path });
             }
@@ -66,8 +76,6 @@ public class HttpServer
         catch (Exception ex)
         {
             Console.WriteLine($"[HttpServer] Error handling {method} {path}: {ex.Message}");
-            Console.WriteLine($"[HttpServer] Stack trace: {ex.StackTrace}");
-            SetCorsHeaders(response);
             response.StatusCode = 500;
             await WriteJson(response, new { error = "Internal Server Error", detail = ex.Message });
         }
@@ -87,9 +95,9 @@ public class HttpServer
 
     private static void SetCorsHeaders(HttpListenerResponse response)
     {
-        response.Headers.Add("Access-Control-Allow-Origin", "http://localhost:5173");
+        response.Headers.Add("Access-Control-Allow-Origin", "*");
         response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
         response.Headers.Add("Access-Control-Allow-Credentials", "true");
     }
 }

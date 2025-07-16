@@ -24,31 +24,54 @@ public class RoomManagementServiceImplement : IRoomManagementService
 
     public async Task<bool> LeaveRoomAsync(int userId, int roomId)
     {
-        Console.WriteLine($"[ROOM_MANAGEMENT] User {userId} leaving room {roomId}");
-        
         var room = await _roomRepository.GetByIdAsync(roomId);
-        if (room == null)
+        if (room == null) return false;
+
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        Console.WriteLine($"[{timestamp}] ❌ PLAYER LEAVING - Room {room.RoomCode} (ID: {roomId}): Player {userId} attempting to leave");
+        
+        // Xóa player khỏi room_players TRƯỚC
+        var deleteResult = await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(userId, roomId);
+        if (!deleteResult)
         {
-            Console.WriteLine($"[ROOM_MANAGEMENT] Room {roomId} not found");
+            Console.WriteLine($"[{timestamp}] ⚠️ PLAYER NOT IN ROOM - Player {userId} was not in room {roomId}");
             return false;
         }
+        
+        var playerCountAfter = await _roomRepository.GetPlayerCountAsync(roomId);
+        Console.WriteLine($"[{timestamp}] 📊 PLAYER LEFT - Room {room.RoomCode}: {playerCountAfter}/{room.MaxPlayers} players remaining");
 
-        // Xóa user khỏi room_players
-        var removed = await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(userId, roomId);
-        if (!removed)
+        // Cập nhật status nếu cần
+        if (playerCountAfter < room.MaxPlayers && (room.Status == "full" || room.Status == "ready"))
         {
-            Console.WriteLine($"[ROOM_MANAGEMENT] User {userId} was not in room {roomId}");
-            return false;
+            await _roomRepository.UpdateStatusAsync(roomId, "waiting");
+            Console.WriteLine($"[{timestamp}] 🔄 ROOM STATUS CHANGED - Room {room.RoomCode}: full/ready → waiting");
         }
 
-        // Kiểm tra nếu user là host
+        // Xử lý owner rời phòng SAU KHI đã xóa khỏi room_players
         if (room.OwnerId == userId)
         {
-            Console.WriteLine($"[ROOM_MANAGEMENT] Host {userId} is leaving room {roomId}");
-            await HandleHostLeaving(roomId);
+            Console.WriteLine($"[{timestamp}] 👑 OWNER LEFT - Room {room.RoomCode}: Checking remaining players");
+            
+            if (playerCountAfter == 0)
+            {
+                Console.WriteLine($"[{timestamp}] 🗑️ ROOM DELETED - Room {room.RoomCode} (ID: {roomId}): No players remaining");
+                await DeleteRoomIfEmptyAsync(roomId);
+            }
+            else
+            {
+                // Chuyển quyền owner cho người chơi đầu tiên còn lại
+                var remainingPlayers = await _roomPlayerRepository.GetByRoomIdAsync(roomId);
+                if (remainingPlayers.Any())
+                {
+                    var nextOwner = remainingPlayers.OrderBy(p => p.CreatedAt).First();
+                    Console.WriteLine($"[{timestamp}] 🔄 OWNERSHIP TRANSFERRED - Room {room.RoomCode}: New owner is Player {nextOwner.UserId}");
+                    await TransferHostAsync(roomId, userId, nextOwner.UserId);
+                }
+            }
         }
 
-        Console.WriteLine($"[ROOM_MANAGEMENT] User {userId} successfully left room {roomId}");
+        Console.WriteLine($"[{timestamp}] ✅ LEAVE COMPLETED - Player {userId} successfully left room {room.RoomCode}");
         return true;
     }
 

@@ -34,8 +34,11 @@ public class RoomRepositoryImplement : IRoomRepository
 
     public async Task<int> AddAsync(Room room)
     {
-        const string query = @"INSERT INTO rooms (room_code, room_name, is_private, owner_id, status, max_players) 
-                               VALUES (@RoomCode, @RoomName, @IsPrivate, @OwnerId, @Status, @MaxPlayers) 
+        room.CreatedAt = DateTime.UtcNow;
+        room.UpdatedAt = DateTime.UtcNow;
+        
+        const string query = @"INSERT INTO rooms (room_code, room_name, is_private, owner_id, status, max_players, created_at, updated_at) 
+                               VALUES (@RoomCode, @RoomName, @IsPrivate, @OwnerId, @Status, @MaxPlayers, @CreatedAt, @UpdatedAt) 
                                RETURNING id";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, room);
@@ -43,6 +46,8 @@ public class RoomRepositoryImplement : IRoomRepository
 
     public async Task UpdateAsync(Room room)
     {
+        room.UpdatedAt = DateTime.UtcNow;
+        
         const string query = @"UPDATE rooms SET room_name = @RoomName, is_private = @IsPrivate, 
                                owner_id = @OwnerId, status = @Status, max_players = @MaxPlayers,
                                updated_at = @UpdatedAt
@@ -89,7 +94,9 @@ public class RoomRepositoryImplement : IRoomRepository
     {
         const string query = @"SELECT COUNT(*) FROM room_players WHERE room_id = @RoomId";
         using var conn = CreateConnection();
-        return await conn.ExecuteScalarAsync<int>(query, new { RoomId = roomId });
+        var count = await conn.ExecuteScalarAsync<int>(query, new { RoomId = roomId });
+        Console.WriteLine($"[ROOM_REPO] Player count for room {roomId}: {count}");
+        return count;
     }
     public async Task UpdateMaxPlayersAsync(int roomId, int maxPlayers)
     {
@@ -114,5 +121,59 @@ public class RoomRepositoryImplement : IRoomRepository
         using var conn = CreateConnection();
         var count = await conn.ExecuteScalarAsync<int>(query, new { RoomCode = roomCode });
         return count > 0;
+    }
+
+    public async Task<IEnumerable<Room>> GetAllRoomsWithDetailsAsync()
+    {
+        const string query = @"SELECT 
+            r.id as Id,
+            r.room_code as RoomCode,
+            r.room_name as RoomName,
+            r.is_private as IsPrivate,
+            r.owner_id as OwnerId,
+            r.status as Status,
+            r.max_players as MaxPlayers,
+            r.created_at as CreatedAt,
+            r.updated_at as UpdatedAt
+            FROM rooms r ORDER BY r.created_at DESC";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<Room>(query);
+    }
+
+    public async Task<string?> GetRoomTopicNameAsync(int roomId)
+    {
+        const string query = @"
+            SELECT COALESCE(t.name, 'Kiến thức chung') 
+            FROM room_settings rs 
+            LEFT JOIN topics t ON t.id = CAST(rs.setting_value AS INTEGER)
+            WHERE rs.room_id = @RoomId AND rs.setting_key = 'topic_id'
+            LIMIT 1";
+        using var conn = CreateConnection();
+        var result = await conn.QuerySingleOrDefaultAsync<string>(query, new { RoomId = roomId });
+        return result ?? "Kiến thức chung";
+    }
+
+    public async Task<int> GetRoomQuestionCountAsync(int roomId)
+    {
+        const string query = @"
+            SELECT COALESCE(CAST(rs.setting_value AS INTEGER), 10) 
+            FROM room_settings rs 
+            WHERE rs.room_id = @RoomId AND rs.setting_key = 'question_count'
+            LIMIT 1";
+        using var conn = CreateConnection();
+        var result = await conn.QuerySingleOrDefaultAsync<int?>(query, new { RoomId = roomId });
+        return result ?? 10;
+    }
+
+    public async Task<int> GetRoomCountdownTimeAsync(int roomId)
+    {
+        const string query = @"
+            SELECT COALESCE(CAST(rs.setting_value AS INTEGER), 300) 
+            FROM room_settings rs 
+            WHERE rs.room_id = @RoomId AND rs.setting_key = 'countdown_seconds'
+            LIMIT 1";
+        using var conn = CreateConnection();
+        var result = await conn.QuerySingleOrDefaultAsync<int?>(query, new { RoomId = roomId });
+        return result ?? 300;
     }
 }
