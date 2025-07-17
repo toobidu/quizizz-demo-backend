@@ -8,7 +8,7 @@ public static class DebugHelper
 {
     public static async Task CheckRoomPlayersInDatabase(string connectionString, int roomId)
     {
-        Console.WriteLine($"=== DEBUG: Checking room_players table for roomId: {roomId} ===");
+        Console.WriteLine($"=== DEBUG: Kiểm tra bảng room_players cho roomId: {roomId} ===");
         
         using var conn = new NpgsqlConnection(connectionString);
         
@@ -22,7 +22,7 @@ public static class DebugHelper
             
         var players = await conn.QueryAsync(query, new { RoomId = roomId });
         
-        Console.WriteLine($"Found {players.Count()} players in room_players table:");
+        Console.WriteLine($"Tìm thấy {players.Count()} người chơi trong bảng room_players:");
         foreach (var player in players)
         {
             Console.WriteLine($"  - UserId: {player.user_id}, Username: {player.username ?? "NULL"}, Score: {player.score}, CreatedAt: {player.created_at}");
@@ -34,11 +34,11 @@ public static class DebugHelper
         
         if (room != null)
         {
-            Console.WriteLine($"Room info - Id: {room.id}, Code: {room.room_code}, Name: {room.room_name}, OwnerId: {room.owner_id}, Status: {room.status}");
+            Console.WriteLine($"Thông tin phòng - Id: {room.id}, Mã: {room.room_code}, Tên: {room.room_name}, Chủ phòng: {room.owner_id}, Trạng thái: {room.status}");
         }
         else
         {
-            Console.WriteLine($"Room {roomId} not found!");
+            Console.WriteLine($"Không tìm thấy phòng {roomId}!");
         }
         
         Console.WriteLine("=== END DEBUG ===");

@@ -23,7 +23,7 @@ public class AuthRouter : IBaseRouter
 
         if (!path.StartsWith("/api/auth")) return false;
 
-        // Handle CORS preflight request
+        // Xử lý yêu cầu CORS preflight
         if (method.ToUpper() == "OPTIONS")
         {
             HttpResponseHelper.WriteOptionsResponse(response);

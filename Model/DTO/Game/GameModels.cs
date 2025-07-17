@@ -20,6 +20,7 @@ public class GameRoom
     public int TotalQuestions { get; set; } = 0;
     public DateTime? QuestionStartTime { get; set; }
     public int QuestionTimeLimit { get; set; } = 30;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class PlayerAnswer
@@ -51,4 +52,27 @@ public class ScoreboardEntry
     public int Rank { get; set; }
     public int CorrectAnswers { get; set; }
     public double AverageTime { get; set; }
+}
+
+public class HostChangeEventData
+{
+    public string NewHost { get; set; } = string.Empty;
+    public int NewHostId { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class RoomJoinEventData
+{
+    public string RoomCode { get; set; } = string.Empty;
+    public bool IsHost { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class RoomPlayerInfo
+{
+    public string Username { get; set; } = string.Empty;
+    public int UserId { get; set; }
+    public bool IsHost { get; set; }
+    public DateTime? JoinTime { get; set; }
+    public bool IsOnline { get; set; }
 }

@@ -10,7 +10,7 @@ namespace ConsoleApp1.Service.Implement;
 /// </summary>
 public class SocketServiceImplement : ISocketService
 {
-    // Các service con được inject thông qua constructor
+    // Các service con được tiêm thông qua constructor
     private readonly ISocketConnectionService _connectionService;           // Quản lý kết nối WebSocket
     private readonly IRoomManagementSocketService _roomManagementService;   // Quản lý phòng chơi
     private readonly IGameFlowSocketService _gameFlowService;               // Luồng game (câu hỏi, timer)
@@ -19,7 +19,7 @@ public class SocketServiceImplement : ISocketService
     private readonly IHostControlSocketService _hostControlService;         // Điều khiển host
 
     /// <summary>
-    /// Constructor - Nhận tất cả các service con thông qua Dependency Injection
+    /// Constructor - Nhận tất cả các service con thông qua tiêm phụ thuộc
     /// </summary>
     public SocketServiceImplement(
         ISocketConnectionService connectionService,
@@ -67,6 +67,12 @@ public class SocketServiceImplement : ISocketService
     /// </summary>
     public async Task UpdateRoomPlayersAsync(string roomCode) 
         => await _roomManagementService.UpdateRoomPlayersAsync(roomCode);
+    
+    /// <summary>
+    /// Broadcast sự kiện player-joined trực tiếp từ database data
+    /// </summary>
+    public async Task BroadcastPlayerJoinedEventAsync(string roomCode, int userId, string username)
+        => await _roomManagementService.BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
     #endregion
 
     #region IGameFlowSocketService - Luồng game và câu hỏi

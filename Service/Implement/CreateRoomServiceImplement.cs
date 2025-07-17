@@ -16,6 +16,8 @@ public class CreateRoomServiceImplement : ICreateRoomService
     private readonly IUserRepository _userRepository;
     private readonly IUserRoleRepository _userRoleRepository;
     private readonly IRoleRepository _roleRepository;
+    private readonly IBroadcastService _broadcastService;
+    private readonly ISocketService _socketService;
 
     public CreateRoomServiceImplement(
         IRoomRepository roomRepository,
@@ -23,7 +25,9 @@ public class CreateRoomServiceImplement : ICreateRoomService
         IRoomPlayerRepository roomPlayerRepository,
         IUserRepository userRepository,
         IUserRoleRepository userRoleRepository,
-        IRoleRepository roleRepository)
+        IRoleRepository roleRepository,
+        IBroadcastService broadcastService,
+        ISocketService socketService)
     {
         _roomRepository = roomRepository;
         _roomSettingsRepository = roomSettingsRepository;
@@ -31,6 +35,8 @@ public class CreateRoomServiceImplement : ICreateRoomService
         _userRepository = userRepository;
         _userRoleRepository = userRoleRepository;
         _roleRepository = roleRepository;
+        _broadcastService = broadcastService;
+        _socketService = socketService;
     }
 
     public async Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request, int userId)
@@ -116,7 +122,22 @@ public class CreateRoomServiceImplement : ICreateRoomService
         {
             Console.WriteLine($"[CREATE_ROOM_SERVICE] Debug error: {ex.Message}");
         }
-        return RoomMapper.ToDTO(room);
+
+        var roomDto = RoomMapper.ToDTO(room);
+        
+        // Broadcast room created và cập nhật danh sách người chơi
+        try
+        {
+            await _broadcastService.BroadcastRoomCreatedAsync(roomDto);
+            await _broadcastService.BroadcastRoomPlayersUpdateAsync(roomCode);
+            Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {roomCode}: Creation and players broadcasted");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{timestamp}] ⚠️ BROADCAST ERROR - Room {roomCode}: {ex.Message}");
+        }
+        
+        return roomDto;
     }
 
     public async Task<bool> UpdateRoomSettingsAsync(int roomId, RoomSetting settings)

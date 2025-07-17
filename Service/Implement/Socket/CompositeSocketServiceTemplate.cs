@@ -43,6 +43,8 @@ public class CompositeSocketServiceTemplate : ISocketService
         => await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
     public async Task UpdateRoomPlayersAsync(string roomCode) 
         => await _roomManagementService.UpdateRoomPlayersAsync(roomCode);
+    public async Task BroadcastPlayerJoinedEventAsync(string roomCode, int userId, string username)
+        => await _roomManagementService.BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
 
     // IGameFlowSocketService
     public async Task StartGameAsync(string roomCode) => await _gameFlowService.StartGameAsync(roomCode);

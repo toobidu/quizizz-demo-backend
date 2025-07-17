@@ -31,7 +31,7 @@ public class UserProfileServiceImplement : IUserProfileService
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null) return null;
 
-        Console.WriteLine($"[DEBUG] User from DB - Id: {user.Id}, Username: {user.Username}, FullName: '{user.FullName}', PhoneNumber: '{user.PhoneNumber}', Address: '{user.Address}'");
+        Console.WriteLine($"[DEBUG] Người dùng từ DB - Id: {user.Id}, Tên đăng nhập: {user.Username}, Họ tên: '{user.FullName}', Số điện thoại: '{user.PhoneNumber}', Địa chỉ: '{user.Address}'");
 
         var stats = await GetUserStatsAsync(userId);
         return new UserProfileDTO(
@@ -68,26 +68,26 @@ public class UserProfileServiceImplement : IUserProfileService
 
     public async Task<bool> UpdateProfileAsync(int userId, UpdateProfileRequest request)
     {
-        Console.WriteLine($"[DEBUG] UpdateProfile - UserId: {userId}, FullName: '{request.FullName}', PhoneNumber: '{request.PhoneNumber}', Address: '{request.Address}'");
+        Console.WriteLine($"[DEBUG] Cập nhật hồ sơ - UserId: {userId}, Họ tên: '{request.FullName}', Số điện thoại: '{request.PhoneNumber}', Địa chỉ: '{request.Address}'");
         
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null) 
         {
-            Console.WriteLine($"[DEBUG] User not found with ID: {userId}");
+            Console.WriteLine($"[DEBUG] Không tìm thấy người dùng với ID: {userId}");
             return false;
         }
 
-        Console.WriteLine($"[DEBUG] Current user - FullName: '{user.FullName}', PhoneNumber: '{user.PhoneNumber}', Address: '{user.Address}'");
+        Console.WriteLine($"[DEBUG] Người dùng hiện tại - Họ tên: '{user.FullName}', Số điện thoại: '{user.PhoneNumber}', Địa chỉ: '{user.Address}'");
 
-        // Kiểm tra phone number trùng lặp nếu có thay đổi
+        // Kiểm tra số điện thoại trùng lặp nếu có thay đổi
         if (!string.IsNullOrEmpty(request.PhoneNumber) && request.PhoneNumber != user.PhoneNumber)
         {
-            Console.WriteLine($"[DEBUG] Checking phone number duplicate: {request.PhoneNumber}");
+            Console.WriteLine($"[DEBUG] Kiểm tra trùng lặp số điện thoại: {request.PhoneNumber}");
             var existingUser = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
             if (existingUser != null && existingUser.Id != userId)
             {
-                Console.WriteLine($"[DEBUG] Phone number already exists for user ID: {existingUser.Id}");
-                return false; // Phone number đã tồn tại
+                Console.WriteLine($"[DEBUG] Số điện thoại đã tồn tại cho người dùng ID: {existingUser.Id}");
+                return false; // Số điện thoại đã tồn tại
             }
         }
 
@@ -96,9 +96,9 @@ public class UserProfileServiceImplement : IUserProfileService
         user.Address = request.Address ?? user.Address;
         user.UpdatedAt = DateTime.UtcNow;
         
-        Console.WriteLine($"[DEBUG] Updating user - FullName: '{user.FullName}', PhoneNumber: '{user.PhoneNumber}', Address: '{user.Address}'");
+        Console.WriteLine($"[DEBUG] Đang cập nhật người dùng - Họ tên: '{user.FullName}', Số điện thoại: '{user.PhoneNumber}', Địa chỉ: '{user.Address}'");
         await _userRepository.UpdateAsync(user);
-        Console.WriteLine($"[DEBUG] Update completed successfully");
+        Console.WriteLine($"[DEBUG] Cập nhật hoàn tất thành công");
         return true;
     }
 

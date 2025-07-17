@@ -85,7 +85,7 @@ namespace ConsoleApp1.Service.Implement
             user.TypeAccount = newTypeAccount;
             await _userRepository.UpdateAsync(user);
 
-            // Update corresponding role in user_roles
+            // Cập nhật vai trò tương ứng trong user_roles
             var roleId = await MapTypeAccountToRoleIdAsync(newTypeAccount);
             if (roleId == 0) return false;
 

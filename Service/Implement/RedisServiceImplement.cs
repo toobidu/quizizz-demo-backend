@@ -24,7 +24,7 @@ public class RedisServiceImplement : IRedisService
         }
         else
         {
-            Console.WriteLine($"[WARNING] Không có quyền nào để set vào Redis cho user {userId} không tạo được phòng, hãy kiểm tra lại");
+            Console.WriteLine($"[WARNING] Không có quyền nào để thiết lập vào Redis cho người dùng {userId}, không thể tạo phòng, hãy kiểm tra lại");
         }
     }
 

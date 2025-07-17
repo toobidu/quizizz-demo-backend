@@ -15,6 +15,7 @@ public class JoinRoomServiceImplement : IJoinRoomService
     private readonly IRoleRepository _roleRepository;
     private readonly ICreateRoomService _createRoomService;
     private readonly ISocketService _socketService;
+    private readonly IBroadcastService _broadcastService;
 
     public JoinRoomServiceImplement(
         IRoomRepository roomRepository,
@@ -23,7 +24,8 @@ public class JoinRoomServiceImplement : IJoinRoomService
         IUserRoleRepository userRoleRepository,
         IRoleRepository roleRepository,
         ICreateRoomService createRoomService,
-        ISocketService socketService)
+        ISocketService socketService,
+        IBroadcastService broadcastService)
     {
         _roomRepository = roomRepository;
         _roomPlayerRepository = roomPlayerRepository;
@@ -32,6 +34,7 @@ public class JoinRoomServiceImplement : IJoinRoomService
         _roleRepository = roleRepository;
         _createRoomService = createRoomService;
         _socketService = socketService;
+        _broadcastService = broadcastService;
     }
 
     public async Task<RoomDTO?> JoinPublicRoomAsync(int roomId, int playerId)
@@ -95,15 +98,18 @@ public class JoinRoomServiceImplement : IJoinRoomService
         Console.WriteLine($"[{timestamp}] ✅ PLAYER JOINED - Room {room.RoomCode} (ID: {roomId}): Player {playerId} joined successfully");
         Console.WriteLine($"[{timestamp}] 📊 WAITING ROOM STATUS - Room {room.RoomCode}: {finalPlayerCount}/{room.MaxPlayers} players | Status: {room.Status}");
         
-        // Broadcast WebSocket update
+        // Broadcast update qua cả WebSocket và HTTP
         try
         {
-            await _socketService.UpdateRoomPlayersAsync(room.RoomCode);
-            Console.WriteLine($"[{timestamp}] 📡 WEBSOCKET BROADCAST - Room {room.RoomCode}: Player join broadcasted");
+            // Broadcast sự kiện player-joined cho các người chơi khác
+            await _broadcastService.BroadcastPlayerJoinedAsync(room.RoomCode, playerId);
+            // Broadcast cập nhật danh sách người chơi
+            await _broadcastService.BroadcastRoomPlayersUpdateAsync(room.RoomCode);
+            Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {room.RoomCode}: Player join broadcasted");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{timestamp}] ⚠️ WEBSOCKET ERROR - Room {room.RoomCode}: {ex.Message}");
+            Console.WriteLine($"[{timestamp}] ⚠️ BROADCAST ERROR - Room {room.RoomCode}: {ex.Message}");
         }
         
         return RoomMapper.ToDTO(room);
@@ -170,15 +176,18 @@ public class JoinRoomServiceImplement : IJoinRoomService
         Console.WriteLine($"[{timestamp}] ✅ PLAYER JOINED - Room {room.RoomCode} (ID: {room.Id}): Player {playerId} joined successfully");
         Console.WriteLine($"[{timestamp}] 📊 WAITING ROOM STATUS - Room {room.RoomCode}: {finalPlayerCount}/{room.MaxPlayers} players | Status: {room.Status}");
         
-        // Broadcast WebSocket update
+        // Broadcast update qua cả WebSocket và HTTP
         try
         {
-            await _socketService.UpdateRoomPlayersAsync(room.RoomCode);
-            Console.WriteLine($"[{timestamp}] 📡 WEBSOCKET BROADCAST - Room {room.RoomCode}: Player join broadcasted");
+            // Broadcast sự kiện player-joined cho các người chơi khác
+            await _broadcastService.BroadcastPlayerJoinedAsync(room.RoomCode, playerId);
+            // Broadcast cập nhật danh sách người chơi
+            await _broadcastService.BroadcastRoomPlayersUpdateAsync(room.RoomCode);
+            Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {room.RoomCode}: Player join broadcasted");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{timestamp}] ⚠️ WEBSOCKET ERROR - Room {room.RoomCode}: {ex.Message}");
+            Console.WriteLine($"[{timestamp}] ⚠️ BROADCAST ERROR - Room {room.RoomCode}: {ex.Message}");
         }
         
         return RoomMapper.ToDTO(room);
@@ -233,19 +242,19 @@ public class JoinRoomServiceImplement : IJoinRoomService
             }
         }
         
-        // Broadcast WebSocket update
+        // Broadcast update qua cả WebSocket và HTTP
         try
         {
             var roomForBroadcast = await _roomRepository.GetByIdAsync(roomId);
             if (roomForBroadcast != null)
             {
-                await _socketService.UpdateRoomPlayersAsync(roomForBroadcast.RoomCode);
-                Console.WriteLine($"[{timestamp}] 📡 WEBSOCKET BROADCAST - Room {roomForBroadcast.RoomCode}: Player leave broadcasted");
+                await _broadcastService.BroadcastRoomPlayersUpdateAsync(roomForBroadcast.RoomCode);
+                Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {roomForBroadcast.RoomCode}: Player leave broadcasted");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{timestamp}] ⚠️ WEBSOCKET ERROR - Leave broadcast: {ex.Message}");
+            Console.WriteLine($"[{timestamp}] ⚠️ BROADCAST ERROR - Leave broadcast: {ex.Message}");
         }
 
         return true;

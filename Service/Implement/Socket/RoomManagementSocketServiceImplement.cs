@@ -1,9 +1,8 @@
 using ConsoleApp1.Service.Interface.Socket;
+using ConsoleApp1.Service.Implement.Socket.RoomManagement;
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using System.Text;
-using System.Text.Json;
 
 namespace ConsoleApp1.Service.Implement.Socket;
 
@@ -17,17 +16,45 @@ namespace ConsoleApp1.Service.Implement.Socket;
 /// </summary>
 public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
 {
-    // Dictionary lưu trữ tất cả các phòng game hiện tại
-    // Key: roomCode, Value: GameRoom object
-    private readonly ConcurrentDictionary<string, GameRoom> _gameRooms = new();
+    // Dictionary lưu trữ tất cả các phòng game hiện tại (shared)
+    private readonly ConcurrentDictionary<string, GameRoom> _gameRooms;
     
-    // Dictionary ánh xạ socketId với roomCode
-    // Key: socketId, Value: roomCode mà socket đang tham gia
-    private readonly ConcurrentDictionary<string, string> _socketToRoom = new();
+    // Dictionary ánh xạ socketId với roomCode (shared)
+    private readonly ConcurrentDictionary<string, string> _socketToRoom;
     
-    // Dictionary lưu trữ các kết nối WebSocket (shared với ConnectionService)
-    // Key: socketId, Value: WebSocket connection
-    private readonly ConcurrentDictionary<string, WebSocket> _connections = new();
+    // Dictionary lưu trữ các kết nối WebSocket (shared)
+    private readonly ConcurrentDictionary<string, WebSocket> _connections;
+
+    // Components
+    private readonly RoomManager _roomManager;
+    private readonly RoomEventBroadcaster _eventBroadcaster;
+
+    /// <summary>
+    /// Constructor nhận shared dictionaries
+    /// </summary>
+    public RoomManagementSocketServiceImplement(
+        ConcurrentDictionary<string, GameRoom> gameRooms,
+        ConcurrentDictionary<string, string> socketToRoom,
+        ConcurrentDictionary<string, WebSocket> connections)
+    {
+        _gameRooms = gameRooms;
+        _socketToRoom = socketToRoom;
+        _connections = connections;
+        _roomManager = new RoomManager(_gameRooms, _socketToRoom, _connections);
+        _eventBroadcaster = new RoomEventBroadcaster(_gameRooms, _connections);
+    }
+    
+    /// <summary>
+    /// Constructor mặc định (backward compatibility)
+    /// </summary>
+    public RoomManagementSocketServiceImplement()
+    {
+        _gameRooms = new ConcurrentDictionary<string, GameRoom>();
+        _socketToRoom = new ConcurrentDictionary<string, string>();
+        _connections = new ConcurrentDictionary<string, WebSocket>();
+        _roomManager = new RoomManager(_gameRooms, _socketToRoom, _connections);
+        _eventBroadcaster = new RoomEventBroadcaster(_gameRooms, _connections);
+    }
 
     /// <summary>
     /// Xử lý khi người chơi tham gia phòng
@@ -38,60 +65,38 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
     /// <param name="userId">ID người chơi trong database</param>
     public async Task JoinRoomAsync(string socketId, string roomCode, string username, int userId)
     {
-        Console.WriteLine($"[ROOM] JoinRoomAsync called - socketId: {socketId}, roomCode: {roomCode}, username: {username}, userId: {userId}");
+        Console.WriteLine($"[ROOM] JoinRoomAsync được gọi - socketId: {socketId}, mã phòng: {roomCode}, tên người dùng: {username}, userId: {userId}");
         
-        // Lưu mapping socketId -> roomCode
-        _socketToRoom[socketId] = roomCode;
-        
-        // Tạo phòng mới nếu chưa tồn tại
-        if (!_gameRooms.ContainsKey(roomCode))
+        try
         {
-            _gameRooms[roomCode] = new GameRoom { RoomCode = roomCode };
-            Console.WriteLine($"[ROOM] Created new game room: {roomCode}");
-        }
-        
-        var gameRoom = _gameRooms[roomCode];
-        
-        // Kiểm tra xem player đã tồn tại chưa (tránh duplicate)
-        var existingPlayer = gameRoom.Players.FirstOrDefault(p => p.UserId == userId);
-        if (existingPlayer != null)
-        {
-            Console.WriteLine($"[ROOM] Player {username} (ID: {userId}) already exists in room {roomCode}, updating socket");
-            existingPlayer.SocketId = socketId; // Cập nhật socketId mới
+            // Thêm player vào room
+            var (success, message, player) = _roomManager.AddPlayerToRoom(roomCode, socketId, username, userId);
+            
+            if (!success)
+            {
+                Console.WriteLine($"[ROOM] Thất bại thêm người chơi {username} vào phòng {roomCode}: {message}");
+                return;
+            }
+
+            if (player == null)
+            {
+                Console.WriteLine($"[ROOM] Đối tượng người chơi là null cho {username}");
+                return;
+            }
+
+            // Gửi thông báo welcome cho player vừa join
+            await _eventBroadcaster.SendWelcomeMessageAsync(socketId, roomCode, player.IsHost, message);
+            
+            // Broadcast sự kiện player-joined cho các user khác trong phòng (không gửi cho chính user vừa join)
+            await BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
+            
+            // Cập nhật danh sách player cho tất cả client trong phòng
             await UpdateRoomPlayersAsync(roomCode);
-            return;
         }
-        
-        // Kiểm tra xem có phải người đầu tiên không (sẽ là host)
-        var isFirstPlayer = gameRoom.Players.Count == 0;
-        
-        // Tạo player mới
-        var player = new GamePlayer
+        catch (Exception ex)
         {
-            Username = username,
-            UserId = userId,
-            SocketId = socketId,
-            IsHost = isFirstPlayer, // Người đầu tiên là host
-            JoinTime = DateTime.UtcNow
-        };
-        
-        // Thêm player vào phòng
-        gameRoom.Players.Add(player);
-        
-        // Log thông tin join
-        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        Console.WriteLine($"[{timestamp}] 🔌 WEBSOCKET JOIN - Room {roomCode}: {username} (ID: {userId}) joined as {(player.IsHost ? "HOST" : "player")}");
-        Console.WriteLine($"[{timestamp}] 📊 WEBSOCKET ROOM STATUS - Room {roomCode}: {gameRoom.Players.Count} players connected | Host: {gameRoom.Players.FirstOrDefault(p => p.IsHost)?.Username}");
-        
-        // Gửi thông báo welcome cho player vừa join
-        await SendToPlayerAsync(socketId, "room-joined", new {
-            roomCode = roomCode,
-            isHost = player.IsHost,
-            message = $"Chào mừng {username} đến phòng {roomCode}!"
-        });
-        
-        // Cập nhật danh sách player cho tất cả client trong phòng
-        await UpdateRoomPlayersAsync(roomCode);
+            Console.WriteLine($"[ROOM] Lỗi trong JoinRoomAsync: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -101,52 +106,31 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
     /// <param name="roomCode">Mã phòng đang tham gia</param>
     public async Task LeaveRoomAsync(string socketId, string roomCode)
     {
-        if (!_gameRooms.ContainsKey(roomCode)) return;
-        
-        var gameRoom = _gameRooms[roomCode];
-        var player = gameRoom.Players.FirstOrDefault(p => p.SocketId == socketId);
-        
-        if (player != null)
+        try
         {
-            // Xóa player khỏi phòng
-            gameRoom.Players.Remove(player);
-            _socketToRoom.TryRemove(socketId, out _);
+            var (success, message, removedPlayer, newHost) = _roomManager.RemovePlayerFromRoom(socketId, roomCode);
             
-            var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-            Console.WriteLine($"[{timestamp}] 🚪 WEBSOCKET LEAVE - Room {roomCode}: {player.Username} (ID: {player.UserId}) left");
-            
-            // Nếu là host rời phòng và còn người khác
-            if (player.IsHost && gameRoom.Players.Count > 0)
+            if (!success)
             {
-                // Chuyển host cho người join sớm nhất tiếp theo
-                var nextHost = gameRoom.Players.OrderBy(p => p.JoinTime ?? DateTime.MaxValue).First();
-                nextHost.IsHost = true;
-                
-                Console.WriteLine($"[{timestamp}] 👑 HOST TRANSFER - Room {roomCode}: {nextHost.Username} is now the host");
-                
-                // Thông báo host mới cho tất cả client
-                await BroadcastToRoomAsync(roomCode, "host-changed", new {
-                    newHost = nextHost.Username,
-                    newHostId = nextHost.UserId,
-                    message = $"{nextHost.Username} đã trở thành host mới"
-                });
+                Console.WriteLine($"[ROOM] Thất bại xóa người chơi khỏi phòng {roomCode}: {message}");
+                return;
             }
-            
-            // Nếu không còn ai trong phòng thì xóa phòng
-            if (gameRoom.Players.Count == 0)
+
+            // Thông báo host mới nếu có
+            if (newHost != null)
             {
-                _gameRooms.TryRemove(roomCode, out _);
-                Console.WriteLine($"[{timestamp}] 🗑️ ROOM DELETED - Room {roomCode}: No players remaining");
-                
-                // Dọn dẹp game session nếu có game đang chạy
-                // Lưu ý: Trong thực tế cần gọi GameFlowSocketService.CleanupGameSessionAsync
-                Console.WriteLine($"[ROOM] Game session cleanup needed for empty room {roomCode}");
+                await _eventBroadcaster.BroadcastHostChangeAsync(roomCode, newHost);
             }
-            else
+
+            // Cập nhật danh sách player nếu room còn tồn tại
+            if (_roomManager.RoomExists(roomCode))
             {
-                // Cập nhật danh sách player cho những người còn lại
                 await UpdateRoomPlayersAsync(roomCode);
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ROOM] Lỗi trong LeaveRoomAsync: {ex.Message}");
         }
     }
 
@@ -156,85 +140,51 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
     /// <param name="roomCode">Mã phòng cần cập nhật</param>
     public async Task UpdateRoomPlayersAsync(string roomCode)
     {
-        if (!_gameRooms.TryGetValue(roomCode, out var gameRoom)) return;
-        
-        // Tạo danh sách player để gửi cho client
-        var playerList = gameRoom.Players.Select(p => new {
-            username = p.Username,
-            userId = p.UserId,
-            isHost = p.IsHost,
-            joinTime = p.JoinTime,
-            isOnline = _connections.ContainsKey(p.SocketId ?? "") && 
-                      _connections.TryGetValue(p.SocketId ?? "", out var ws) && 
-                      ws.State == System.Net.WebSockets.WebSocketState.Open // Kiểm tra trạng thái kết nối thực tế
-        }).ToList();
-        
-        // Broadcast danh sách player mới cho tất cả client trong phòng
-        await BroadcastToRoomAsync(roomCode, "room-players-updated", new {
-            roomCode = roomCode,
-            players = playerList,
-            totalPlayers = playerList.Count,
-            host = playerList.FirstOrDefault(p => p.isHost)?.username
-        });
-        
-        Console.WriteLine($"[ROOM] Updated player list for room {roomCode}: {playerList.Count} players");
-    }
-    
-    /// <summary>
-    /// Gửi message đến tất cả client trong một phòng cụ thể
-    /// </summary>
-    private async Task BroadcastToRoomAsync(string roomCode, string eventName, object data)
-    {
-        if (!_gameRooms.TryGetValue(roomCode, out var gameRoom)) return;
-        
-        var message = JsonSerializer.Serialize(new {
-            eventName = eventName,
-            data = data
-        });
-        var buffer = Encoding.UTF8.GetBytes(message);
-        
-        // Gửi đến tất cả player trong phòng
-        var sendTasks = gameRoom.Players
-            .Where(p => !string.IsNullOrEmpty(p.SocketId))
-            .Select(async player =>
-            {
-                if (_connections.TryGetValue(player.SocketId!, out var socket) && 
-                    socket.State == WebSocketState.Open)
-                {
-                    try
-                    {
-                        await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[ROOM] Failed to send message to {player.Username}: {ex.Message}");
-                    }
-                }
-            });
-        
-        await Task.WhenAll(sendTasks);
-    }
-    
-    /// <summary>
-    /// Gửi message đến một client cụ thể
-    /// </summary>
-    private async Task SendToPlayerAsync(string socketId, string eventName, object data)
-    {
-        if (_connections.TryGetValue(socketId, out var socket) && socket.State == WebSocketState.Open)
+        try
         {
-            try
+            var room = _roomManager.GetRoom(roomCode);
+            if (room == null || room.Players.Count == 0)
             {
-                var message = JsonSerializer.Serialize(new {
-                    eventName = eventName,
-                    data = data
-                });
-                var buffer = Encoding.UTF8.GetBytes(message);
-                await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+                Console.WriteLine($"[ROOM] Không tìm thấy người chơi nào cho phòng {roomCode}");
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ROOM] Failed to send message to socket {socketId}: {ex.Message}");
-            }
+
+            await _eventBroadcaster.BroadcastRoomPlayersUpdateAsync(roomCode, room.Players);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ROOM] Lỗi cập nhật người chơi phòng cho {roomCode}: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Broadcast sự kiện player-joined chỉ tới những người đã có trong phòng trước đó
+    /// KHÔNG gửi cho người vừa join để tránh duplicate event
+    /// </summary>
+    /// <param name="roomCode">Mã phòng</param>
+    /// <param name="userId">ID người chơi mới</param>
+    /// <param name="username">Tên người chơi mới</param>
+    public async Task BroadcastPlayerJoinedEventAsync(string roomCode, int userId, string username)
+    {
+        try
+        {
+            var playerJoinedData = new
+            {
+                UserId = userId,
+                Username = username,
+                Score = 0,
+                TimeTaken = "00:00:00"
+            };
+
+            // Broadcast chỉ tới những người đã có trong phòng trước đó (loại trừ người vừa join)
+            await _eventBroadcaster.BroadcastToOthersAsync(roomCode, userId, "player-joined", playerJoinedData);
+            
+            Console.WriteLine($"[ROOM] Broadcasted player-joined event for {username} (ID: {userId}) to others in room {roomCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ROOM] Lỗi broadcast player-joined event: {ex.Message}");
+        }
+    }
+
 }

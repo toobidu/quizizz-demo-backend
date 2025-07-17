@@ -11,6 +11,9 @@ using ConsoleApp1.Service.Implement.Socket;
 using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Service.Interface.Socket;
 using ConsoleApp1.Repository.Interface;
+using ConsoleApp1.Model.DTO.Game;
+using System.Collections.Concurrent;
+using System.Net.WebSockets;
 
 internal class Program
 {
@@ -66,13 +69,21 @@ internal class Program
         IPermissionService permissionService = new PermissionServiceImplement(permissionRepo);
         IUserService userService = new UserServiceImplement(userRepo, userRoleRepo, roleRepo);
         IUserProfileService userProfileService = new UserProfileServiceImplement(userRepo, userAnswerRepo, rankRepo, topicRepo);
-        // Khởi tạo các WebSocket service con
-        ISocketConnectionService socketConnectionService = new SocketConnectionServiceImplement();
-        IRoomManagementSocketService roomManagementSocketService = new RoomManagementSocketServiceImplement();
+        // Khởi tạo shared dictionaries cho WebSocket services
+        var gameRooms = new ConcurrentDictionary<string, GameRoom>();
+        var webSocketConnections = new ConcurrentDictionary<string, WebSocket>();
+        var socketToRoom = new ConcurrentDictionary<string, string>();
+        
+        // Khởi tạo các WebSocket service con với shared dictionaries
+        var socketConnectionService = new SocketConnectionServiceImplement(webSocketConnections, socketToRoom);
+        var roomManagementSocketService = new RoomManagementSocketServiceImplement(gameRooms, socketToRoom, webSocketConnections);
         IGameFlowSocketService gameFlowSocketService = new GameFlowSocketServiceImplement();
         IPlayerInteractionSocketService playerInteractionSocketService = new PlayerInteractionSocketServiceImplement();
         IScoringSocketService scoringSocketService = new ScoringSocketServiceImplement();
-        IHostControlSocketService hostControlSocketService = new HostControlSocketServiceImplement();
+        IHostControlSocketService hostControlSocketService = new HostControlSocketServiceImplement(gameRooms, webSocketConnections);
+        
+        // Thiết lập reference giữa các service
+        socketConnectionService.SetRoomManagementService(roomManagementSocketService);
         
         // Khởi tạo composite SocketService với tất cả dependency
         ISocketService socketService = new SocketServiceImplement(
@@ -83,12 +94,19 @@ internal class Program
             scoringSocketService,
             hostControlSocketService
         );
+        // Khởi tạo BroadcastService trước (không cần joinRoomService):
+        IBroadcastService broadcastService = new BroadcastServiceImplement(
+            socketService, roomRepo, roomPlayerRepo, userRepo, null!); // Tạm thời null
+
         ICreateRoomService createRoomService = new CreateRoomServiceImplement(
-            roomRepo, roomSettingsRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo);
+            roomRepo, roomSettingsRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, broadcastService, socketService);
         IJoinRoomService joinRoomService = new JoinRoomServiceImplement(
-            roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService, socketService);
+            roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService, socketService, broadcastService);
         IRoomManagementService roomManagementService = new RoomManagementServiceImplement(
             roomRepo, roomPlayerRepo, roomSettingsRepo, userRepo);
+
+        // Cập nhật joinRoomService cho BroadcastService:
+        ((BroadcastServiceImplement)broadcastService).SetJoinRoomService(joinRoomService);
 
         // Khởi tạo Controller:
         var authController = new AuthController(authService, jwtHelper);
