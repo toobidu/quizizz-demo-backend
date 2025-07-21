@@ -30,4 +30,10 @@ public interface IBroadcastService
     /// Broadcast cập nhật danh sách tất cả phòng (cho lobby)
     /// </summary>
     Task BroadcastRoomsListUpdateAsync();
+    
+    /// <summary>
+    /// Broadcast sự kiện đồng bộ khi có người chơi tham gia phòng qua HTTP API
+    /// Gửi event 'sync-room-join' để frontend biết cần gửi WebSocket joinRoom
+    /// </summary>
+    Task BroadcastSyncRoomJoinAsync(string roomCode, int userId, string username);
 }

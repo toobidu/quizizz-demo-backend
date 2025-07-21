@@ -16,4 +16,8 @@ public interface IUserAnswerRepository
     Task<Dictionary<int, int>> GetAnswerDistributionAsync(int questionId);
     Task<double> GetAverageResponseTimeAsync(int questionId);
     Task<IEnumerable<(int QuestionId, double AverageTime)>> GetAverageTimesByRoomAsync(int roomId);
+    Task<IEnumerable<UserAnswer>> GetByGameSessionIdAsync(int gameSessionId);
+    Task<IEnumerable<UserAnswer>> GetByGameSessionIdAndQuestionIdAsync(int gameSessionId, int questionId);
+    Task UpdateScoreAsync(int userId, int roomId, int questionId, int score);
+    Task UpdateGameSessionIdAsync(int userId, int roomId, int questionId, int gameSessionId);
 }

@@ -74,6 +74,19 @@ public class RoomManager
         if (existingPlayer != null)
         {
             Console.WriteLine($"[ROOM] Người chơi {username} (ID: {userId}) đã tồn tại, đang cập nhật socket");
+            
+            // Xóa mapping socketId cũ -> roomCode nếu có
+            if (!string.IsNullOrEmpty(existingPlayer.SocketId))
+            {
+                Console.WriteLine($"[ROOM] Xóa socket cũ {existingPlayer.SocketId} cho người chơi {username} (ID: {userId})");
+                _socketToRoom.TryRemove(existingPlayer.SocketId, out _);
+                // Xóa khỏi _connections nếu cần
+                if (_connections.ContainsKey(existingPlayer.SocketId))
+                {
+                    _connections.TryRemove(existingPlayer.SocketId, out _);
+                }
+            }
+            
             existingPlayer.SocketId = socketId;
             return (true, "Cập nhật kết nối thành công", existingPlayer);
         }
@@ -105,25 +118,44 @@ public class RoomManager
         string socketId, string roomCode)
     {
         if (!_gameRooms.ContainsKey(roomCode))
+        {
+            Console.WriteLine($"[ROOM] Phòng {roomCode} không tồn tại khi cố gắng xóa người chơi");
             return (false, "Phòng không tồn tại", null, null);
+        }
 
         var gameRoom = _gameRooms[roomCode];
         var player = gameRoom.Players.FirstOrDefault(p => p.SocketId == socketId);
 
         if (player == null)
+        {
+            Console.WriteLine($"[ROOM] Không tìm thấy người chơi với socketId {socketId} trong phòng {roomCode}");
             return (false, "Player không tồn tại trong phòng", null, null);
+        }
+
+        // Lưu thông tin người chơi trước khi xóa
+        var playerToRemove = new GamePlayer
+        {
+            UserId = player.UserId,
+            Username = player.Username,
+            SocketId = player.SocketId,
+            IsHost = player.IsHost,
+            Score = player.Score,
+            Status = player.Status,
+            JoinTime = player.JoinTime
+        };
 
         // Xóa player
         gameRoom.Players.Remove(player);
         _socketToRoom.TryRemove(socketId, out _);
 
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        Console.WriteLine($"[{timestamp}] WEBSOCKET LEAVE - Room {roomCode}: {player.Username} (ID: {player.UserId}) left");
+        Console.WriteLine($"[{timestamp}] WEBSOCKET LEAVE - Room {roomCode}: {playerToRemove.Username} (ID: {playerToRemove.UserId}) left");
+        Console.WriteLine($"[{timestamp}] PLAYER COUNT - Room {roomCode}: {gameRoom.Players.Count} players remaining");
 
         GamePlayer? newHost = null;
 
         // Xử lý chuyển host nếu cần
-        if (player.IsHost && gameRoom.Players.Count > 0)
+        if (playerToRemove.IsHost && gameRoom.Players.Count > 0)
         {
             newHost = gameRoom.Players.OrderBy(p => p.JoinTime ?? DateTime.MaxValue).First();
             newHost.IsHost = true;
@@ -137,8 +169,13 @@ public class RoomManager
             Console.WriteLine($"[{timestamp}] ROOM DELETED - Room {roomCode}: No players remaining");
             Console.WriteLine($"[ROOM] Game session cleanup needed for empty room {roomCode}");
         }
+        else
+        {
+            // Log danh sách người chơi còn lại
+            Console.WriteLine($"[{timestamp}] REMAINING PLAYERS - Room {roomCode}: {string.Join(", ", gameRoom.Players.Select(p => p.Username))}");
+        }
 
-        return (true, "Player đã rời phòng", player, newHost);
+        return (true, "Player đã rời phòng", playerToRemove, newHost);
     }
 
     /// <summary>
@@ -167,6 +204,79 @@ public class RoomManager
     public bool RoomExists(string roomCode)
     {
         return _gameRooms.ContainsKey(roomCode);
+    }
+    
+    /// <summary>
+    /// Xóa player khỏi room theo userId thay vì socketId
+    /// Sử dụng khi cần xóa người chơi dựa trên userId (ví dụ: khi gọi từ HTTP API)
+    /// </summary>
+    public (bool Success, string Message, GamePlayer? RemovedPlayer, GamePlayer? NewHost) RemovePlayerFromRoomByUserId(
+        int userId, string roomCode)
+    {
+        if (!_gameRooms.ContainsKey(roomCode))
+        {
+            Console.WriteLine($"[ROOM] Phòng {roomCode} không tồn tại khi cố gắng xóa người chơi theo userId");
+            return (false, "Phòng không tồn tại", null, null);
+        }
+
+        var gameRoom = _gameRooms[roomCode];
+        var player = gameRoom.Players.FirstOrDefault(p => p.UserId == userId);
+
+        if (player == null)
+        {
+            Console.WriteLine($"[ROOM] Không tìm thấy người chơi với userId {userId} trong phòng {roomCode}");
+            return (false, "Player không tồn tại trong phòng", null, null);
+        }
+
+        // Lưu thông tin người chơi trước khi xóa
+        var playerToRemove = new GamePlayer
+        {
+            UserId = player.UserId,
+            Username = player.Username,
+            SocketId = player.SocketId,
+            IsHost = player.IsHost,
+            Score = player.Score,
+            Status = player.Status,
+            JoinTime = player.JoinTime
+        };
+        
+        // Xóa mapping socketId -> roomCode nếu có
+        if (!string.IsNullOrEmpty(player.SocketId))
+        {
+            _socketToRoom.TryRemove(player.SocketId, out _);
+        }
+
+        // Xóa player
+        gameRoom.Players.Remove(player);
+
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        Console.WriteLine($"[{timestamp}] USER ID LEAVE - Room {roomCode}: {playerToRemove.Username} (ID: {playerToRemove.UserId}) left");
+        Console.WriteLine($"[{timestamp}] PLAYER COUNT - Room {roomCode}: {gameRoom.Players.Count} players remaining");
+
+        GamePlayer? newHost = null;
+
+        // Xử lý chuyển host nếu cần
+        if (playerToRemove.IsHost && gameRoom.Players.Count > 0)
+        {
+            newHost = gameRoom.Players.OrderBy(p => p.JoinTime ?? DateTime.MaxValue).First();
+            newHost.IsHost = true;
+            Console.WriteLine($"[{timestamp}] HOST TRANSFER - Room {roomCode}: {newHost.Username} is now the host");
+        }
+
+        // Xóa room nếu không còn ai
+        if (gameRoom.Players.Count == 0)
+        {
+            _gameRooms.TryRemove(roomCode, out _);
+            Console.WriteLine($"[{timestamp}] ROOM DELETED - Room {roomCode}: No players remaining");
+            Console.WriteLine($"[ROOM] Game session cleanup needed for empty room {roomCode}");
+        }
+        else
+        {
+            // Log danh sách người chơi còn lại
+            Console.WriteLine($"[{timestamp}] REMAINING PLAYERS - Room {roomCode}: {string.Join(", ", gameRoom.Players.Select(p => p.Username))}");
+        }
+
+        return (true, "Player đã rời phòng", playerToRemove, newHost);
     }
 
     /// <summary>

@@ -9,7 +9,7 @@ namespace ConsoleApp1.Service.Implement.Socket;
 /// </summary>
 public class CompositeSocketServiceTemplate : ISocketService
 {
-    private readonly ISocketConnectionService _connectionService;
+    private readonly Interface.Socket.ISocketConnectionService _connectionService;
     private readonly IRoomManagementSocketService _roomManagementService;
     private readonly IGameFlowSocketService _gameFlowService;
     private readonly IPlayerInteractionSocketService _playerInteractionService;
@@ -17,7 +17,7 @@ public class CompositeSocketServiceTemplate : ISocketService
     private readonly IHostControlSocketService _hostControlService;
 
     public CompositeSocketServiceTemplate(
-        ISocketConnectionService connectionService,
+        Interface.Socket.ISocketConnectionService connectionService,
         IRoomManagementSocketService roomManagementService,
         IGameFlowSocketService gameFlowService,
         IPlayerInteractionSocketService playerInteractionService,
@@ -41,10 +41,20 @@ public class CompositeSocketServiceTemplate : ISocketService
         => await _roomManagementService.JoinRoomAsync(socketId, roomCode, username, userId);
     public async Task LeaveRoomAsync(string socketId, string roomCode) 
         => await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+    public async Task LeaveRoomByUserIdAsync(int userId, string roomCode)
+        => await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
     public async Task UpdateRoomPlayersAsync(string roomCode) 
         => await _roomManagementService.UpdateRoomPlayersAsync(roomCode);
     public async Task BroadcastPlayerJoinedEventAsync(string roomCode, int userId, string username)
         => await _roomManagementService.BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
+    public async Task BroadcastPlayerLeftEventAsync(string roomCode, int userId, string username)
+        => await _roomManagementService.BroadcastPlayerLeftEventAsync(roomCode, userId, username);
+    public async Task BroadcastToAllConnectionsAsync(string roomCode, string eventName, object data)
+        => await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, eventName, data);
+    public async Task RequestPlayersUpdateAsync(string socketId, string roomCode)
+        => await _roomManagementService.RequestPlayersUpdateAsync(socketId, roomCode);
+    public async Task<ConsoleApp1.Model.DTO.Game.GameRoom?> GetRoomAsync(string roomCode)
+        => await _roomManagementService.GetRoomAsync(roomCode);
 
     // IGameFlowSocketService
     public async Task StartGameAsync(string roomCode) => await _gameFlowService.StartGameAsync(roomCode);

@@ -6,18 +6,18 @@ using System.Net.WebSockets;
 namespace ConsoleApp1.Service.Implement.Socket.GameFlow;
 
 /// <summary>
-/// Điều phối chính cho luồng game - Chịu trách nhiệm:
-/// 1. Khởi tạo và điều phối các component
-/// 2. Xử lý các yêu cầu từ bên ngoài
-/// 3. Đảm bảo tính nhất quán giữa các component
+/// Main orchestrator for game flow - Responsible for:
+/// 1. Initializing and coordinating components
+/// 2. Processing external requests
+/// 3. Ensuring consistency between components
 /// </summary>
 public class GameFlowOrchestrator
 {
-    // Các dictionary được chia sẻ
+    // Shared dictionaries
     private readonly ConcurrentDictionary<string, GameRoom> _gameRooms;
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
 
-    // Các component chuyên biệt
+    // Specialized components
     private readonly GameSessionManager _sessionManager;
     private readonly GameTimerManager _timerManager;
     private readonly GameEventBroadcaster _eventBroadcaster;
@@ -32,7 +32,7 @@ public class GameFlowOrchestrator
         _gameRooms = gameRooms;
         _connections = connections;
 
-        // Khởi tạo các component
+        // Initialize components
         _sessionManager = new GameSessionManager();
         _timerManager = new GameTimerManager();
         _eventBroadcaster = new GameEventBroadcaster(_gameRooms, _connections);
@@ -42,170 +42,170 @@ public class GameFlowOrchestrator
     }
 
     /// <summary>
-    /// Bắt đầu game đơn giản (không có câu hỏi)
+    /// Start a simple game (without questions)
     /// </summary>
-    public async Task BatDauGameDonGianAsync(string maPhong)
+    public async Task StartSimpleGameAsync(string roomId)
     {
-        Console.WriteLine($"[GAME] Đang bắt đầu game đơn giản cho phòng: {maPhong}");
+        Console.WriteLine($"[GAME] Starting simple game for room: {roomId}");
         
         try
         {
-            await _lifecycleManager.BatDauGameDonGianAsync(maPhong);
+            await _lifecycleManager.BatDauGameDonGianAsync(roomId);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi bắt đầu game đơn giản cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when starting simple game for room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Bắt đầu game với danh sách câu hỏi
+    /// Start game with a list of questions
     /// </summary>
-    public async Task BatDauGameVoiCauHoiAsync(string maPhong, object cauHoi, int thoiGianGioiHan)
+    public async Task StartGameWithQuestionsAsync(string roomId, object question, int timeLimit)
     {
-        Console.WriteLine($"[GAME] Đang bắt đầu game với câu hỏi cho phòng: {maPhong}, thời gian: {thoiGianGioiHan}s");
+        Console.WriteLine($"[GAME] Starting game with questions for room: {roomId}, time: {timeLimit}s");
         
         try
         {
-            await _lifecycleManager.BatDauGameVoiCauHoiAsync(maPhong, cauHoi, thoiGianGioiHan);
+            await _lifecycleManager.BatDauGameVoiCauHoiAsync(roomId, question, timeLimit);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi bắt đầu game với câu hỏi cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when starting game with questions for room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Gửi câu hỏi tiếp theo cho người chơi cụ thể
+    /// Send next question to a specific player
     /// </summary>
-    public async Task GuiCauHoiTiepTheoChoNguoiChoiAsync(string maPhong, string tenNguoiChoi)
+    public async Task SendNextQuestionToPlayerAsync(string roomId, string playerName)
     {
-        Console.WriteLine($"[GAME] Đang gửi câu hỏi tiếp theo cho {tenNguoiChoi} trong phòng {maPhong}");
+        Console.WriteLine($"[GAME] Sending next question to {playerName} in room {roomId}");
         
         try
         {
-            await _questionManager.GuiCauHoiTiepTheoChoNguoiChoiAsync(maPhong, tenNguoiChoi);
+            await _questionManager.GuiCauHoiTiepTheoChoNguoiChoiAsync(roomId, playerName);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi gửi câu hỏi cho {tenNguoiChoi}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when sending question to {playerName}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Gửi câu hỏi đến tất cả người chơi
+    /// Send question to all players
     /// </summary>
-    public async Task GuiCauHoiAsync(string maPhong, object cauHoi, int viTriCauHoi, int tongSoCauHoi)
+    public async Task SendQuestionAsync(string roomId, object question, int questionPosition, int totalQuestions)
     {
-        Console.WriteLine($"[GAME] Đang gửi câu hỏi {viTriCauHoi + 1}/{tongSoCauHoi} đến phòng {maPhong}");
+        Console.WriteLine($"[GAME] Sending question {questionPosition + 1}/{totalQuestions} to room {roomId}");
         
         try
         {
-            await _questionManager.GuiCauHoiAsync(maPhong, cauHoi, viTriCauHoi, tongSoCauHoi);
+            await _questionManager.GuiCauHoiAsync(roomId, question, questionPosition, totalQuestions);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi gửi câu hỏi đến phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when sending question to room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Gửi cập nhật thời gian game
+    /// Send game time update
     /// </summary>
-    public async Task GuiCapNhatThoiGianGameAsync(string maPhong)
+    public async Task SendGameTimeUpdateAsync(string roomId)
     {
         try
         {
-            await _progressTracker.GuiCapNhatThoiGianGameAsync(maPhong);
+            await _progressTracker.GuiCapNhatThoiGianGameAsync(roomId);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi gửi cập nhật thời gian cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when sending time update for room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Lấy tiến độ người chơi
+    /// Get player progress
     /// </summary>
-    public async Task LayTienDoNguoiChoiAsync(string maPhong, string tenNguoiChoi)
+    public async Task GetPlayerProgressAsync(string roomId, string playerName)
     {
-        Console.WriteLine($"[GAME] Đang lấy tiến độ cho {tenNguoiChoi} trong phòng {maPhong}");
+        Console.WriteLine($"[GAME] Getting progress for {playerName} in room {roomId}");
         
         try
         {
-            await _progressTracker.LayTienDoNguoiChoiAsync(maPhong, tenNguoiChoi);
+            await _progressTracker.LayTienDoNguoiChoiAsync(roomId, playerName);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi lấy tiến độ cho {tenNguoiChoi}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when getting progress for {playerName}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Broadcast tiến độ tất cả người chơi
+    /// Broadcast progress of all players
     /// </summary>
-    public async Task BroadcastTienDoNguoiChoiAsync(string maPhong)
+    public async Task BroadcastPlayerProgressAsync(string roomId)
     {
-        Console.WriteLine($"[GAME] Đang broadcast tiến độ người chơi cho phòng {maPhong}");
+        Console.WriteLine($"[GAME] Broadcasting player progress for room {roomId}");
         
         try
         {
-            await _progressTracker.BroadcastTienDoNguoiChoiAsync(maPhong);
+            await _progressTracker.BroadcastTienDoNguoiChoiAsync(roomId);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi broadcast tiến độ cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when broadcasting progress for room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Dọn dẹp game session
+    /// Cleanup game session
     /// </summary>
-    public async Task DonDepGameSessionAsync(string maPhong)
+    public async Task CleanupGameSessionAsync(string roomId)
     {
-        Console.WriteLine($"[GAME] Đang dọn dẹp game session cho phòng {maPhong}");
+        Console.WriteLine($"[GAME] Cleaning up game session for room {roomId}");
         
         try
         {
-            await _lifecycleManager.DonDepGameSessionAsync(maPhong);
+            await _lifecycleManager.DonDepGameSessionAsync(roomId);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi dọn dẹp game session cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when cleaning up game session for room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Cập nhật trạng thái game
+    /// Update game state
     /// </summary>
-    public async Task CapNhatTrangThaiGameAsync(string maPhong, string trangThai)
+    public async Task UpdateGameStateAsync(string roomId, string state)
     {
-        Console.WriteLine($"[GAME] Đang cập nhật trạng thái game cho phòng {maPhong} thành: {trangThai}");
+        Console.WriteLine($"[GAME] Updating game state for room {roomId} to: {state}");
         
         try
         {
-            await _lifecycleManager.CapNhatTrangThaiGameAsync(maPhong, trangThai);
+            await _lifecycleManager.CapNhatTrangThaiGameAsync(roomId, state);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi cập nhật trạng thái game cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when updating game state for room {roomId}: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Gửi đếm ngược
+    /// Send countdown
     /// </summary>
-    public async Task GuiDemNguocAsync(string maPhong, int demNguoc)
+    public async Task SendCountdownAsync(string roomId, int countdown)
     {
-        Console.WriteLine($"[GAME] Đang gửi đếm ngược {demNguoc} cho phòng {maPhong}");
+        Console.WriteLine($"[GAME] Sending countdown {countdown} for room {roomId}");
         
         try
         {
-            await _lifecycleManager.GuiDemNguocAsync(maPhong, demNguoc);
+            await _lifecycleManager.GuiDemNguocAsync(roomId, countdown);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME] Lỗi khi gửi đếm ngược cho phòng {maPhong}: {ex.Message}");
+            Console.WriteLine($"[GAME] Error when sending countdown for room {roomId}: {ex.Message}");
         }
     }
 }

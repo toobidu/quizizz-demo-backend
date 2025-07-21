@@ -14,4 +14,8 @@ public interface IJoinRoomService
     Task<IEnumerable<PlayerInRoomDTO>> GetPlayersInRoomAsync(int roomId);
     Task<RoomDetailsDTO?> GetRoomDetailsAsync(int roomId);
     Task<bool> StartGameAsync(int roomId, int userId);
+    
+    // Broadcast methods
+    Task BroadcastRoomPlayersUpdateAsync(string roomCode);
+    Task BroadcastPlayerJoinedAsync(string roomCode, int newPlayerId);
 }

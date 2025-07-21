@@ -27,6 +27,15 @@ public class RoomPlayer
     [Column("time_taken")]
     public TimeSpan TimeTaken { get; set; }
     
+    [Column("status")]
+    public string Status { get; set; } = "waiting";
+    
+    [Column("socket_id")]
+    public string SocketId { get; set; }
+    
+    [Column("last_activity")]
+    public DateTime? LastActivity { get; set; }
+    
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
     
@@ -35,6 +44,21 @@ public class RoomPlayer
 
     public RoomPlayer() { }
 
+    public RoomPlayer(int roomId, int userId, int score, TimeSpan timeTaken, 
+                     string status, string socketId, DateTime? lastActivity,
+                     DateTime createdAt, DateTime updatedAt)
+    {
+        RoomId = roomId;
+        UserId = userId;
+        Score = score;
+        TimeTaken = timeTaken;
+        Status = status;
+        SocketId = socketId;
+        LastActivity = lastActivity;
+        CreatedAt = createdAt;
+        UpdatedAt = updatedAt;
+    }
+    
     public RoomPlayer(int roomId, int userId, int score, TimeSpan timeTaken, 
                      DateTime createdAt, DateTime updatedAt)
     {

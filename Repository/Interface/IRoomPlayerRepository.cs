@@ -11,4 +11,8 @@ public interface IRoomPlayerRepository
     Task UpdateAsync(RoomPlayer roomPlayer);
     Task<bool> DeleteByUserIdAndRoomIdAsync(int userId, int roomId);
     Task UpdateTimeAndScoreAsync(int roomId, int userId, TimeSpan timeTaken, int score);
+    Task UpdatePlayerStatusAsync(int roomId, int userId, string status);
+    Task UpdateSocketIdAsync(int roomId, int userId, string socketId);
+    Task UpdateLastActivityAsync(int roomId, int userId);
+    Task<IEnumerable<RoomPlayer>> GetBySocketIdAsync(string socketId);
 }

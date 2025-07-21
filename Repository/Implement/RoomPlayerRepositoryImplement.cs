@@ -64,8 +64,8 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
         
         roomPlayer.CreatedAt = DateTime.UtcNow;
         roomPlayer.UpdatedAt = DateTime.UtcNow;
-        const string query = @"INSERT INTO room_players (room_id, user_id, score, time_taken, created_at, updated_at) 
-                               VALUES (@RoomId, @UserId, @Score, @TimeTaken, @CreatedAt, @UpdatedAt)"; 
+        const string query = @"INSERT INTO room_players (room_id, user_id, score, time_taken, status, socket_id, last_activity, created_at, updated_at) 
+                               VALUES (@RoomId, @UserId, @Score, @TimeTaken, @Status, @SocketId, @LastActivity, @CreatedAt, @UpdatedAt)"; 
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, roomPlayer);
         Console.WriteLine($"[ROOM_PLAYER_REPO] Player added successfully - RoomId: {roomPlayer.RoomId}, UserId: {roomPlayer.UserId}");
@@ -75,7 +75,9 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
     public async Task UpdateAsync(RoomPlayer roomPlayer)
     {
         const string query = @"UPDATE room_players 
-                               SET score = @Score, time_taken = @TimeTaken 
+                               SET score = @Score, time_taken = @TimeTaken, 
+                                   status = @Status, socket_id = @SocketId, 
+                                   last_activity = @LastActivity 
                                WHERE room_id = @RoomId AND user_id = @UserId";
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, roomPlayer);
@@ -113,5 +115,50 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, 
             new { RoomId = roomId, UserId = userId, TimeTaken = timeTaken, Score = score });
+    }
+    
+    public async Task UpdatePlayerStatusAsync(int roomId, int userId, string status)
+    {
+        const string query = @"
+        UPDATE room_players 
+        SET status = @Status,
+            last_activity = CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        WHERE room_id = @RoomId 
+        AND user_id = @UserId";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, 
+            new { RoomId = roomId, UserId = userId, Status = status });
+    }
+    
+    public async Task UpdateSocketIdAsync(int roomId, int userId, string socketId)
+    {
+        const string query = @"
+        UPDATE room_players 
+        SET socket_id = @SocketId,
+            last_activity = CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        WHERE room_id = @RoomId 
+        AND user_id = @UserId";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, 
+            new { RoomId = roomId, UserId = userId, SocketId = socketId });
+    }
+    
+    public async Task UpdateLastActivityAsync(int roomId, int userId)
+    {
+        const string query = @"
+        UPDATE room_players 
+        SET last_activity = CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        WHERE room_id = @RoomId 
+        AND user_id = @UserId";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, 
+            new { RoomId = roomId, UserId = userId });
+    }
+    
+    public async Task<IEnumerable<RoomPlayer>> GetBySocketIdAsync(string socketId)
+    {
+        const string query = @"SELECT * FROM room_players WHERE socket_id = @SocketId";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<RoomPlayer>(query, new { SocketId = socketId });
     }
 }

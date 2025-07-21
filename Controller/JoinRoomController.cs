@@ -6,7 +6,7 @@ namespace ConsoleApp1.Controller;
 
 public class JoinRoomController
 {
-    private readonly IJoinRoomService _joinRoomService;
+    public readonly IJoinRoomService _joinRoomService;
     private readonly IAuthorizationService _authorizationService;
 
     public JoinRoomController(IJoinRoomService joinRoomService, IAuthorizationService authorizationService)

@@ -24,8 +24,8 @@ public class EmailServiceImplement : IEmailService
             {
                 From = new MailAddress(_emailConfig.FromEmail, _emailConfig.FromName),
                 Subject = "Mã OTP đặt lại mật khẩu",
-                Body = CreateOtpEmailBody(otpCode),
-                IsBodyHtml = true
+                /*Body = CreateOtpEmailBody(otpCode),
+                IsBodyHtml = true*/
             };
             
             mailMessage.To.Add(toEmail);
@@ -57,8 +57,8 @@ public class EmailServiceImplement : IEmailService
             {
                 From = new MailAddress(_emailConfig.FromEmail, _emailConfig.FromName),
                 Subject = "Chào mừng bạn đến với Quizizz!",
-                Body = CreateWelcomeEmailBody(username),
-                IsBodyHtml = true
+                /*Body = CreateWelcomeEmailBody(username),
+                IsBodyHtml = true*/
             };
             
             mailMessage.To.Add(toEmail);
@@ -80,7 +80,7 @@ public class EmailServiceImplement : IEmailService
         }
     }
 
-    private string CreateOtpEmailBody(string otpCode)
+    /*private string CreateOtpEmailBody(string otpCode)
     {
         return $@"
         <html>
@@ -135,5 +135,5 @@ public class EmailServiceImplement : IEmailService
             </div>
         </body>
         </html>";
-    }
+    }*/
 }

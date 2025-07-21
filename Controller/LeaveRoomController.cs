@@ -14,6 +14,15 @@ public class LeaveRoomController
         _authorizationService = authorizationService;
     }
 
+/* <<<<<<<<<<<<<<  ✨ Windsurf Command ⭐ >>>>>>>>>>>>>>>> */
+    /// <summary>
+    /// Rời khỏi phòng
+    /// Quyền: room.leave
+    /// </summary>
+    /// <param name="roomId">ID của phòng</param>
+    /// <param name="userId">ID của người chơi</param>
+    /// <returns>Trạng thái rời phòng</returns>
+/* <<<<<<<<<<  79ed9321-1a85-4ca8-b53c-51998af013bf  >>>>>>>>>>> */
     public async Task<ApiResponse<bool>> LeaveRoomAsync(int roomId, int userId)
     {
         if (!await _authorizationService.HasPermissionAsync(userId, "room.leave"))

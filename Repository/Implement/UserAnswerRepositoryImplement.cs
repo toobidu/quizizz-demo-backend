@@ -73,8 +73,8 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
     public async Task<int> AddAsync(UserAnswer answer)
     {
         const string query = @"
-            INSERT INTO user_answers (user_id, room_id, question_id, answer_id, is_correct, time_taken) 
-            VALUES (@UserId, @RoomId, @QuestionId, @AnswerId, @IsCorrect, @TimeTaken) 
+            INSERT INTO user_answers (user_id, room_id, question_id, answer_id, is_correct, time_taken, game_session_id, score) 
+            VALUES (@UserId, @RoomId, @QuestionId, @AnswerId, @IsCorrect, @TimeTaken, @GameSessionId, @Score) 
             RETURNING id";
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, answer);
@@ -84,7 +84,8 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
     {
         const string query = @"
             UPDATE user_answers 
-            SET answer_id = @AnswerId, is_correct = @IsCorrect, time_taken = @TimeTaken 
+            SET answer_id = @AnswerId, is_correct = @IsCorrect, time_taken = @TimeTaken,
+                game_session_id = @GameSessionId, score = @Score 
             WHERE user_id = @UserId AND room_id = @RoomId AND question_id = @QuestionId";
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, answer);
@@ -143,5 +144,43 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         using var conn = CreateConnection();
         return await conn.QueryAsync<(int QuestionId, double AverageTime)>(query, new { RoomId = roomId });
     }
-
+    
+    public async Task<IEnumerable<UserAnswer>> GetByGameSessionIdAsync(int gameSessionId)
+    {
+        const string query = @"SELECT * FROM user_answers WHERE game_session_id = @GameSessionId";
+        using var conn = CreateConnection();
+        var result = await conn.QueryAsync<UserAnswer>(query, new { GameSessionId = gameSessionId });
+        return result.ToList();
+    }
+    
+    public async Task<IEnumerable<UserAnswer>> GetByGameSessionIdAndQuestionIdAsync(int gameSessionId, int questionId)
+    {
+        const string query = @"SELECT * FROM user_answers 
+            WHERE game_session_id = @GameSessionId AND question_id = @QuestionId";
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<UserAnswer>(query, 
+            new { GameSessionId = gameSessionId, QuestionId = questionId });
+    }
+    
+    public async Task UpdateScoreAsync(int userId, int roomId, int questionId, int score)
+    {
+        const string query = @"
+            UPDATE user_answers 
+            SET score = @Score 
+            WHERE user_id = @UserId AND room_id = @RoomId AND question_id = @QuestionId";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, 
+            new { UserId = userId, RoomId = roomId, QuestionId = questionId, Score = score });
+    }
+    
+    public async Task UpdateGameSessionIdAsync(int userId, int roomId, int questionId, int gameSessionId)
+    {
+        const string query = @"
+            UPDATE user_answers 
+            SET game_session_id = @GameSessionId 
+            WHERE user_id = @UserId AND room_id = @RoomId AND question_id = @QuestionId";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(query, 
+            new { UserId = userId, RoomId = roomId, QuestionId = questionId, GameSessionId = gameSessionId });
+    }
 }

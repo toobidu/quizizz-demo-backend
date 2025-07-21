@@ -11,7 +11,7 @@ namespace ConsoleApp1.Service.Implement;
 public class SocketServiceImplement : ISocketService
 {
     // Các service con được tiêm thông qua constructor
-    private readonly ISocketConnectionService _connectionService;           // Quản lý kết nối WebSocket
+    private readonly Interface.Socket.ISocketConnectionService _connectionService;           // Quản lý kết nối WebSocket
     private readonly IRoomManagementSocketService _roomManagementService;   // Quản lý phòng chơi
     private readonly IGameFlowSocketService _gameFlowService;               // Luồng game (câu hỏi, timer)
     private readonly IPlayerInteractionSocketService _playerInteractionService; // Tương tác người chơi
@@ -22,7 +22,7 @@ public class SocketServiceImplement : ISocketService
     /// Constructor - Nhận tất cả các service con thông qua tiêm phụ thuộc
     /// </summary>
     public SocketServiceImplement(
-        ISocketConnectionService connectionService,
+        Interface.Socket.ISocketConnectionService connectionService,
         IRoomManagementSocketService roomManagementService,
         IGameFlowSocketService gameFlowService,
         IPlayerInteractionSocketService playerInteractionService,
@@ -57,10 +57,16 @@ public class SocketServiceImplement : ISocketService
         => await _roomManagementService.JoinRoomAsync(socketId, roomCode, username, userId);
     
     /// <summary>
-    /// Xử lý khi người chơi rời phòng
+    /// Xử lý khi người chơi rời phòng qua socketId
     /// </summary>
     public async Task LeaveRoomAsync(string socketId, string roomCode) 
         => await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+        
+    /// <summary>
+    /// Xử lý khi người chơi rời phòng qua userId
+    /// </summary>
+    public async Task LeaveRoomByUserIdAsync(int userId, string roomCode) 
+        => await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
     
     /// <summary>
     /// Cập nhật danh sách người chơi trong phòng cho tất cả client
@@ -73,6 +79,30 @@ public class SocketServiceImplement : ISocketService
     /// </summary>
     public async Task BroadcastPlayerJoinedEventAsync(string roomCode, int userId, string username)
         => await _roomManagementService.BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
+    
+    /// <summary>
+    /// Broadcast sự kiện player-left trực tiếp từ database data
+    /// </summary>
+    public async Task BroadcastPlayerLeftEventAsync(string roomCode, int userId, string username)
+        => await _roomManagementService.BroadcastPlayerLeftEventAsync(roomCode, userId, username);
+        
+    /// <summary>
+    /// Broadcast message đến tất cả WebSocket connections hiện tại
+    /// </summary>
+    public async Task BroadcastToAllConnectionsAsync(string roomCode, string eventName, object data)
+        => await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, eventName, data);
+        
+    /// <summary>
+    /// Xử lý yêu cầu cập nhật danh sách người chơi từ client
+    /// </summary>
+    public async Task RequestPlayersUpdateAsync(string socketId, string roomCode)
+        => await _roomManagementService.RequestPlayersUpdateAsync(socketId, roomCode);
+        
+    /// <summary>
+    /// Lấy thông tin phòng theo mã phòng
+    /// </summary>
+    public async Task<ConsoleApp1.Model.DTO.Game.GameRoom?> GetRoomAsync(string roomCode)
+        => await _roomManagementService.GetRoomAsync(roomCode);
     #endregion
 
     #region IGameFlowSocketService - Luồng game và câu hỏi

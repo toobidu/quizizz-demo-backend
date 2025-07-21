@@ -7,21 +7,21 @@ using System.Net.WebSockets;
 namespace ConsoleApp1.Service.Implement.Socket;
 
 /// <summary>
-/// Service xử lý luồng game qua WebSocket - Chịu trách nhiệm:
-/// 1. Bắt đầu và kết thúc game
-/// 2. Gửi câu hỏi và quản lý thời gian
-/// 3. Theo dõi tiến độ người chơi
-/// 4. Cập nhật trạng thái game
+/// Service handling game flow via WebSocket - Responsible for:
+/// 1. Starting and ending games
+/// 2. Sending questions and managing time
+/// 3. Tracking player progress
+/// 4. Updating game state
 /// </summary>
 public class GameFlowSocketServiceImplement : IGameFlowSocketService
 {
-    // Dictionary lưu trữ các phòng game (chia sẻ với RoomManagementService)
+    // Dictionary storing game rooms (shared with RoomManagementService)
     private readonly ConcurrentDictionary<string, GameRoom> _gameRooms = new();
     
-    // Dictionary lưu trữ các kết nối WebSocket (chia sẻ với ConnectionService)
+    // Dictionary storing WebSocket connections (shared with ConnectionService)
     private readonly ConcurrentDictionary<string, WebSocket> _connections = new();
 
-    // Component điều phối chính
+    // Main orchestrator component
     private readonly GameFlowOrchestrator _orchestrator;
 
     public GameFlowSocketServiceImplement()
@@ -30,114 +30,114 @@ public class GameFlowSocketServiceImplement : IGameFlowSocketService
     }
 
     /// <summary>
-    /// Bắt đầu game trong phòng (phiên bản đơn giản)
+    /// Start a game in the room (simple version)
     /// </summary>
-    /// <param name="roomCode">Mã phòng cần bắt đầu game</param>
+    /// <param name="roomCode">Room code to start the game</param>
     public async Task StartGameAsync(string roomCode)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang bắt đầu trò chơi đơn giản cho phòng: {roomCode}");
-        await _orchestrator.BatDauGameDonGianAsync(roomCode);
+        Console.WriteLine($"[GAMEFLOW] Starting simple game for room: {roomCode}");
+        await _orchestrator.StartSimpleGameAsync(roomCode);
     }
 
     /// <summary>
-    /// Bắt đầu game với danh sách câu hỏi và thời gian giới hạn
+    /// Start a game with a list of questions and time limit
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
-    /// <param name="questions">Danh sách câu hỏi (JSON object)</param>
-    /// <param name="gameTimeLimit">Thời gian giới hạn cho toàn bộ game (giây)</param>
+    /// <param name="roomCode">Room code</param>
+    /// <param name="questions">List of questions (JSON object)</param>
+    /// <param name="gameTimeLimit">Time limit for the entire game (seconds)</param>
     public async Task StartGameWithQuestionsAsync(string roomCode, object questions, int gameTimeLimit)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang bắt đầu trò chơi với câu hỏi cho phòng: {roomCode}, thời gian: {gameTimeLimit}s");
-        await _orchestrator.BatDauGameVoiCauHoiAsync(roomCode, questions, gameTimeLimit);
+        Console.WriteLine($"[GAMEFLOW] Starting game with questions for room: {roomCode}, time: {gameTimeLimit}s");
+        await _orchestrator.StartGameWithQuestionsAsync(roomCode, questions, gameTimeLimit);
     }
 
     /// <summary>
-    /// Gửi câu hỏi tiếp theo cho một người chơi cụ thể
+    /// Send the next question to a specific player
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
-    /// <param name="username">Tên người chơi cần nhận câu hỏi</param>
+    /// <param name="roomCode">Room code</param>
+    /// <param name="username">Username of the player to receive the question</param>
     public async Task SendNextQuestionToPlayerAsync(string roomCode, string username)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang gửi câu hỏi tiếp theo cho người chơi {username} trong phòng {roomCode}");
-        await _orchestrator.GuiCauHoiTiepTheoChoNguoiChoiAsync(roomCode, username);
+        Console.WriteLine($"[GAMEFLOW] Sending next question to player {username} in room {roomCode}");
+        await _orchestrator.SendNextQuestionToPlayerAsync(roomCode, username);
     }
 
     /// <summary>
-    /// Gửi câu hỏi đến tất cả người chơi trong phòng
-    /// Dùng trong chế độ synchronized (tất cả cùng câu hỏi)
+    /// Send a question to all players in the room
+    /// Used in synchronized mode (all players get the same question)
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
-    /// <param name="question">Câu hỏi cần gửi (JSON object)</param>
-    /// <param name="questionIndex">Thứ tự câu hỏi (bắt đầu từ 0)</param>
-    /// <param name="totalQuestions">Tổng số câu hỏi</param>
+    /// <param name="roomCode">Room code</param>
+    /// <param name="question">Question to send (JSON object)</param>
+    /// <param name="questionIndex">Question order (starting from 0)</param>
+    /// <param name="totalQuestions">Total number of questions</param>
     public async Task SendQuestionAsync(string roomCode, object question, int questionIndex, int totalQuestions)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang gửi câu hỏi {questionIndex + 1}/{totalQuestions} tới phòng {roomCode}");
-        await _orchestrator.GuiCauHoiAsync(roomCode, question, questionIndex, totalQuestions);
+        Console.WriteLine($"[GAMEFLOW] Sending question {questionIndex + 1}/{totalQuestions} to room {roomCode}");
+        await _orchestrator.SendQuestionAsync(roomCode, question, questionIndex, totalQuestions);
     }
 
     /// <summary>
-    /// Gửi cập nhật thời gian game còn lại
-    /// Được gọi định kỳ bởi timer
+    /// Send remaining game time update
+    /// Called periodically by a timer
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
+    /// <param name="roomCode">Room code</param>
     public async Task SendGameTimerUpdateAsync(string roomCode)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang gửi cập nhật thời gian trò chơi cho phòng {roomCode}");
-        await _orchestrator.GuiCapNhatThoiGianGameAsync(roomCode);
+        Console.WriteLine($"[GAMEFLOW] Sending game timer update for room {roomCode}");
+        await _orchestrator.SendGameTimeUpdateAsync(roomCode);
     }
 
     /// <summary>
-    /// Lấy tiến độ của một người chơi cụ thể
+    /// Get the progress of a specific player
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
-    /// <param name="username">Tên người chơi</param>
+    /// <param name="roomCode">Room code</param>
+    /// <param name="username">Player's username</param>
     public async Task GetPlayerProgressAsync(string roomCode, string username)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang lấy tiến độ cho người chơi {username} trong phòng {roomCode}");
-        await _orchestrator.LayTienDoNguoiChoiAsync(roomCode, username);
+        Console.WriteLine($"[GAMEFLOW] Getting progress for player {username} in room {roomCode}");
+        await _orchestrator.GetPlayerProgressAsync(roomCode, username);
     }
 
     /// <summary>
-    /// Broadcast tiến độ của tất cả người chơi
-    /// Để hiển thị realtime leaderboard
+    /// Broadcast progress of all players
+    /// For displaying realtime leaderboard
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
+    /// <param name="roomCode">Room code</param>
     public async Task BroadcastPlayerProgressAsync(string roomCode)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang phát sóng tiến độ người chơi cho phòng {roomCode}");
-        await _orchestrator.BroadcastTienDoNguoiChoiAsync(roomCode);
+        Console.WriteLine($"[GAMEFLOW] Broadcasting player progress for room {roomCode}");
+        await _orchestrator.BroadcastPlayerProgressAsync(roomCode);
     }
 
     /// <summary>
-    /// Dọn dẹp game session khi kết thúc
+    /// Clean up game session when it ends
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
+    /// <param name="roomCode">Room code</param>
     public async Task CleanupGameSessionAsync(string roomCode)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang dọn dẹp phiên trò chơi cho phòng {roomCode}");
-        await _orchestrator.DonDepGameSessionAsync(roomCode);
+        Console.WriteLine($"[GAMEFLOW] Cleaning up game session for room {roomCode}");
+        await _orchestrator.CleanupGameSessionAsync(roomCode);
     }
 
     /// <summary>
-    /// Cập nhật trạng thái game
+    /// Update game state
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
-    /// <param name="gameState">Trạng thái mới (waiting, countdown, playing, ended)</param>
+    /// <param name="roomCode">Room code</param>
+    /// <param name="gameState">New state (waiting, countdown, playing, ended)</param>
     public async Task UpdateGameStateAsync(string roomCode, string gameState)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang cập nhật trạng thái trò chơi cho phòng {roomCode} thành: {gameState}");
-        await _orchestrator.CapNhatTrangThaiGameAsync(roomCode, gameState);
+        Console.WriteLine($"[GAMEFLOW] Updating game state for room {roomCode} to: {gameState}");
+        await _orchestrator.UpdateGameStateAsync(roomCode, gameState);
     }
 
     /// <summary>
-    /// Gửi đếm ngược trước khi bắt đầu game
+    /// Send countdown before starting the game
     /// </summary>
-    /// <param name="roomCode">Mã phòng</param>
-    /// <param name="countdown">Số giây đếm ngược (3, 2, 1, 0)</param>
+    /// <param name="roomCode">Room code</param>
+    /// <param name="countdown">Countdown seconds (3, 2, 1, 0)</param>
     public async Task SendCountdownAsync(string roomCode, int countdown)
     {
-        Console.WriteLine($"[GAMEFLOW] Đang gửi đếm ngược {countdown} giây cho phòng {roomCode}");
-        await _orchestrator.GuiDemNguocAsync(roomCode, countdown);
+        Console.WriteLine($"[GAMEFLOW] Sending countdown {countdown} seconds for room {roomCode}");
+        await _orchestrator.SendCountdownAsync(roomCode, countdown);
     }
 }

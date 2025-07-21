@@ -284,6 +284,24 @@ public class JoinRoomRouter : IBaseRouter
             
             var result = await _controller.GetPlayersInRoomAsync(roomId, userId.Value);
             Console.WriteLine($"[JoinRoomRouter] GetPlayersInRoom result - Success: {result.IsSuccess}, PlayerCount: {result.Data?.Count() ?? 0}");
+            
+            // Sau khi lấy dữ liệu, gọi broadcast để đảm bảo cập nhật qua WebSocket
+            try
+            {
+                var room = await _controller.GetRoomDetailsAsync(roomId, userId.Value);
+                if (room.IsSuccess && room.Data != null)
+                {
+                    // Gọi broadcast để cập nhật danh sách người chơi qua WebSocket
+                    await _controller._joinRoomService.BroadcastRoomPlayersUpdateAsync(room.Data.RoomCode);
+                    Console.WriteLine($"[JoinRoomRouter] Triggered WebSocket update for room {room.Data.RoomCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[JoinRoomRouter] Error triggering WebSocket update: {ex.Message}");
+            }
+            
+            // Trả về kết quả API
             HttpResponseHelper.WriteJsonResponse(response, result);
             return;
         }
@@ -303,6 +321,18 @@ public class JoinRoomRouter : IBaseRouter
                 
                 var result = await _controller.GetPlayersInRoomAsync(actualRoomId, userId.Value);
                 Console.WriteLine($"[JoinRoomRouter] GetPlayersInRoom result - Success: {result.IsSuccess}, PlayerCount: {result.Data?.Count() ?? 0}");
+                
+                // Gọi broadcast để cập nhật danh sách người chơi qua WebSocket
+                try
+                {
+                    await _controller._joinRoomService.BroadcastRoomPlayersUpdateAsync(roomCode);
+                    Console.WriteLine($"[JoinRoomRouter] Triggered WebSocket update for room {roomCode}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[JoinRoomRouter] Error triggering WebSocket update: {ex.Message}");
+                }
+                
                 HttpResponseHelper.WriteJsonResponse(response, result);
                 return;
             }

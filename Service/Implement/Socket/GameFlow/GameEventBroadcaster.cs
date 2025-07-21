@@ -117,8 +117,9 @@ public class GameEventBroadcaster
         if (!_gameRooms.TryGetValue(roomCode, out var gameRoom)) return;
 
         var message = JsonSerializer.Serialize(new {
-            eventName = eventName,
-            data = data
+            type = eventName,
+            data = data,
+            timestamp = DateTime.UtcNow
         });
         var buffer = Encoding.UTF8.GetBytes(message);
 
@@ -158,8 +159,9 @@ public class GameEventBroadcaster
             try
             {
                 var message = JsonSerializer.Serialize(new {
-                    eventName = eventName,
-                    data = data
+                    type = eventName,
+                    data = data,
+                    timestamp = DateTime.UtcNow
                 });
                 var buffer = Encoding.UTF8.GetBytes(message);
                 await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);

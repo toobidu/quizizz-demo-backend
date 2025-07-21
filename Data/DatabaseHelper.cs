@@ -1,11 +1,24 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Npgsql;
+using System.Data;
 
 namespace ConsoleApp1.Data;
 
-public static class DatabaseHelper
+public class DatabaseHelper
 {
-    private static string GetConnectionString()
+    private readonly string _connectionString;
+
+    public DatabaseHelper(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public IDbConnection GetConnection()
+    {
+        return new NpgsqlConnection(_connectionString);
+    }
+
+    public static string GetConnectionStringFromConfig()
     {
         var builder = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
@@ -14,10 +27,5 @@ public static class DatabaseHelper
         IConfiguration config = builder.Build();
 
         return config.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-    }
-
-    public static NpgsqlConnection GetConnection()
-    {
-        return new NpgsqlConnection(GetConnectionString());
     }
 }

@@ -3,6 +3,7 @@ using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Mapper.Rooms;
+using System.Collections.Concurrent;
 
 namespace ConsoleApp1.Service.Implement;
 
@@ -15,7 +16,7 @@ public class JoinRoomServiceImplement : IJoinRoomService
     private readonly IRoleRepository _roleRepository;
     private readonly ICreateRoomService _createRoomService;
     private readonly ISocketService _socketService;
-    private readonly IBroadcastService _broadcastService;
+    public readonly IBroadcastService _broadcastService;
 
     public JoinRoomServiceImplement(
         IRoomRepository roomRepository,
@@ -78,6 +79,20 @@ public class JoinRoomServiceImplement : IJoinRoomService
         {
             Console.WriteLine($"[JoinRoomService] Player {playerId} is in another room {activeRoom.RoomCode}, removing them first");
             await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, activeRoom.Id);
+            
+            // Gửi sự kiện rời phòng qua WebSocket
+            try 
+            {
+                await _socketService.LeaveRoomByUserIdAsync(playerId, activeRoom.RoomCode);
+                Console.WriteLine($"[JoinRoomService] Sent leave room event for player {playerId} from room {activeRoom.RoomCode}");
+                
+                // Đợi một chút để đảm bảo sự kiện rời phòng được xử lý
+                await Task.Delay(200);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[JoinRoomService] Error sending leave room event: {ex.Message}");
+            }
         }
 
         Console.WriteLine($"[JoinRoomService] Adding player {playerId} to room {roomId}");
@@ -156,6 +171,20 @@ public class JoinRoomServiceImplement : IJoinRoomService
         {
             Console.WriteLine($"[JoinRoomService] Player {playerId} is in another room {activeRoom.RoomCode}, removing them first");
             await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, activeRoom.Id);
+            
+            // Gửi sự kiện rời phòng qua WebSocket
+            try 
+            {
+                await _socketService.LeaveRoomByUserIdAsync(playerId, activeRoom.RoomCode);
+                Console.WriteLine($"[JoinRoomService] Sent leave room event for player {playerId} from room {activeRoom.RoomCode}");
+                
+                // Đợi một chút để đảm bảo sự kiện rời phòng được xử lý
+                await Task.Delay(200);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[JoinRoomService] Error sending leave room event: {ex.Message}");
+            }
         }
 
         Console.WriteLine($"[JoinRoomService] Adding player {playerId} to room {room.RoomCode}");
@@ -248,13 +277,15 @@ public class JoinRoomServiceImplement : IJoinRoomService
             var roomForBroadcast = await _roomRepository.GetByIdAsync(roomId);
             if (roomForBroadcast != null)
             {
-                await _broadcastService.BroadcastRoomPlayersUpdateAsync(roomForBroadcast.RoomCode);
-                Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {roomForBroadcast.RoomCode}: Player leave broadcasted");
+                // Sử dụng phương thức LeaveRoomByUserIdAsync mới để xử lý rời phòng qua WebSocket
+                await _socketService.LeaveRoomByUserIdAsync(playerId, roomForBroadcast.RoomCode);
+                Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {roomForBroadcast.RoomCode}: Player {playerId} left via WebSocket");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[{timestamp}] ⚠️ BROADCAST ERROR - Leave broadcast: {ex.Message}");
+            Console.WriteLine($"[{timestamp}] ⚠️ STACK TRACE: {ex.StackTrace}");
         }
 
         return true;
@@ -326,6 +357,9 @@ public class JoinRoomServiceImplement : IJoinRoomService
         return result;
     }
 
+    // Dictionary để theo dõi thời gian gửi sự kiện cuối cùng cho mỗi phòng
+    private readonly ConcurrentDictionary<string, DateTime> _lastGetPlayersTime = new();
+    
     public async Task<IEnumerable<PlayerInRoomDTO>> GetPlayersInRoomAsync(int roomId)
     {
         Console.WriteLine($"[JoinRoomService] GetPlayersInRoomAsync called for roomId: {roomId}");
@@ -351,6 +385,36 @@ public class JoinRoomServiceImplement : IJoinRoomService
         }
 
         Console.WriteLine($"[JoinRoomService] Returning {result.Count} players for room {roomId}");
+        
+        // Tìm roomCode để gửi broadcast cập nhật
+        try
+        {
+            var room = await _roomRepository.GetByIdAsync(roomId);
+            if (room != null)
+            {
+                // Kiểm tra xem đã gửi sự kiện này gần đây chưa (trong vòng 2 giây)
+                string cacheKey = $"get_players_{room.RoomCode}";
+                if (_lastGetPlayersTime.TryGetValue(cacheKey, out var lastTime) && 
+                    (DateTime.UtcNow - lastTime).TotalMilliseconds < 2000)
+                {
+                    Console.WriteLine($"[JoinRoomService] Skipping WebSocket update for room {room.RoomCode} (sent {(DateTime.UtcNow - lastTime).TotalMilliseconds}ms ago)");
+                }
+                else
+                {
+                    // Cập nhật thời gian gửi mới nhất
+                    _lastGetPlayersTime[cacheKey] = DateTime.UtcNow;
+                    
+                    // Gửi broadcast cập nhật danh sách người chơi qua WebSocket
+                    await _broadcastService.BroadcastRoomPlayersUpdateAsync(room.RoomCode);
+                    Console.WriteLine($"[JoinRoomService] Triggered WebSocket update for room {room.RoomCode}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[JoinRoomService] Error triggering WebSocket update: {ex.Message}");
+        }
+        
         return result;
     }
 
@@ -397,6 +461,15 @@ public class JoinRoomServiceImplement : IJoinRoomService
         await _roomRepository.UpdateStatusAsync(roomId, "active");
         return true;
     }
-
-
+    
+    // Triển khai các phương thức broadcast từ interface IJoinRoomService
+    public async Task BroadcastRoomPlayersUpdateAsync(string roomCode)
+    {
+        await _broadcastService.BroadcastRoomPlayersUpdateAsync(roomCode);
+    }
+    
+    public async Task BroadcastPlayerJoinedAsync(string roomCode, int newPlayerId)
+    {
+        await _broadcastService.BroadcastPlayerJoinedAsync(roomCode, newPlayerId);
+    }
 }

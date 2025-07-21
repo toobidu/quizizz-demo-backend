@@ -223,10 +223,51 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
             // Nếu socket đang trong phòng nào đó thì rời phòng
             if (_socketToRoom.TryGetValue(socketId, out var roomCode))
             {
-                // Gọi service khác để xử lý việc rời phòng
-                // Hiện tại chỉ cleanup mapping
-                _socketToRoom.TryRemove(socketId, out _);
-                Console.WriteLine($"[SOCKET] Socket {socketId} đã được xóa khỏi ánh xạ phòng {roomCode}");
+                try
+                {
+                    // Gọi RoomManagementService để xử lý việc rời phòng
+                    if (_roomManagementService != null)
+                    {
+                        Console.WriteLine($"[SOCKET] Socket {socketId} đang rời phòng {roomCode} do ngắt kết nối");
+                        
+                        // Tìm userId của người chơi từ phòng
+                        var room = await _roomManagementService.GetRoomAsync(roomCode);
+                        if (room != null)
+                        {
+                            var player = room.Players.FirstOrDefault(p => p.SocketId == socketId);
+                            if (player != null)
+                            {
+                                // Sử dụng LeaveRoomByUserIdAsync để đảm bảo xóa người chơi khỏi database
+                                await _roomManagementService.LeaveRoomByUserIdAsync(player.UserId, roomCode);
+                                Console.WriteLine($"[SOCKET] Socket {socketId} (UserId: {player.UserId}) đã rời phòng {roomCode} thành công");
+                            }
+                            else
+                            {
+                                await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+                                Console.WriteLine($"[SOCKET] Socket {socketId} đã rời phòng {roomCode} thành công");
+                            }
+                        }
+                        else
+                        {
+                            await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+                            Console.WriteLine($"[SOCKET] Socket {socketId} đã rời phòng {roomCode} thành công");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[SOCKET] RoomManagementService chưa được thiết lập, không thể xử lý rời phòng");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SOCKET] Lỗi khi xử lý rời phòng cho socket {socketId}: {ex.Message}");
+                }
+                finally
+                {
+                    // Cleanup mapping
+                    _socketToRoom.TryRemove(socketId, out _);
+                    Console.WriteLine($"[SOCKET] Socket {socketId} đã được xóa khỏi ánh xạ phòng {roomCode}");
+                }
             }
             Console.WriteLine($"[SOCKET] WebSocket đã ngắt kết nối: {socketId}");
         }
@@ -274,6 +315,16 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 case "joinRoom":
                     // Xử lý join room event
                     await HandleJoinRoomEvent(socketId, data);
+                    break;
+                    
+                case "leaveRoom":
+                    // Xử lý leave room event
+                    await HandleLeaveRoomEvent(socketId, data);
+                    break;
+                    
+                case "request-players-update":
+                    // Xử lý yêu cầu cập nhật danh sách người chơi
+                    await HandleRequestPlayersUpdateEvent(socketId, data);
                     break;
                     
                 // Các event khác sẽ được xử lý bởi các service khác
@@ -364,6 +415,136 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         catch (Exception ex)
         {
             Console.WriteLine($"[SOCKET] Lỗi xử lý joinRoom: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Xử lý event leaveRoom từ WebSocket client
+    /// </summary>
+    private async Task HandleLeaveRoomEvent(string socketId, Dictionary<string, object> data)
+    {
+        try
+        {
+            Console.WriteLine($"[SOCKET] HandleLeaveRoomEvent data: {JsonSerializer.Serialize(data)}");
+            
+            // Lấy thông tin từ message - kiểm tra cả direct và nested trong "data"
+            string? roomCode = null;
+            string? userIdStr = null;
+            
+            // Kiểm tra direct fields trước
+            roomCode = data.GetValueOrDefault("roomCode")?.ToString();
+            userIdStr = data.GetValueOrDefault("userId")?.ToString();
+            
+            // Nếu không có, kiểm tra trong "data" nested
+            if ((string.IsNullOrEmpty(roomCode) || string.IsNullOrEmpty(userIdStr)) && data.ContainsKey("data"))
+            {
+                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
+                if (nestedData != null)
+                {
+                    roomCode = roomCode ?? nestedData.GetValueOrDefault("roomCode")?.ToString();
+                    userIdStr = userIdStr ?? nestedData.GetValueOrDefault("userId")?.ToString();
+                }
+            }
+            
+            // Nếu vẫn không có roomCode, thử lấy từ mapping
+            if (string.IsNullOrEmpty(roomCode))
+            {
+                if (!_socketToRoom.TryGetValue(socketId, out roomCode))
+                {
+                    Console.WriteLine($"[SOCKET] Không tìm thấy roomCode cho socketId {socketId}");
+                    return;
+                }
+            }
+            
+            // Kiểm tra xem socket có thực sự đang ở trong phòng không
+            if (!_socketToRoom.TryGetValue(socketId, out var currentRoom) || currentRoom != roomCode)
+            {
+                Console.WriteLine($"[SOCKET] Socket {socketId} không ở trong phòng {roomCode}, bỏ qua sự kiện rời phòng");
+                return;
+            }
+            
+            Console.WriteLine($"[SOCKET] Xử lý leaveRoom: socketId={socketId}, roomCode={roomCode}, userId={userIdStr}");
+            
+            // Sử dụng shared RoomManagementSocketService
+            if (_roomManagementService != null)
+            {
+                // Nếu có userId, sử dụng LeaveRoomByUserIdAsync để đảm bảo xóa người chơi khỏi database
+                if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+                {
+                    await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
+                }
+                else
+                {
+                    await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+                }
+                
+                // Xóa mapping socketId -> roomCode
+                _socketToRoom.TryRemove(socketId, out _);
+                Console.WriteLine($"[SOCKET] Đã xóa mapping socketId {socketId} -> roomCode {roomCode}");
+            }
+            else
+            {
+                Console.WriteLine($"[SOCKET] RoomManagementService chưa được thiết lập!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SOCKET] Lỗi xử lý leaveRoom: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Xử lý event request-players-update từ WebSocket client
+    /// </summary>
+    private async Task HandleRequestPlayersUpdateEvent(string socketId, Dictionary<string, object> data)
+    {
+        try
+        {
+            Console.WriteLine($"[SOCKET] HandleRequestPlayersUpdateEvent data: {JsonSerializer.Serialize(data)}");
+            
+            // Lấy thông tin từ message - kiểm tra cả direct và nested trong "data"
+            string? roomCode = null;
+            
+            // Kiểm tra direct fields trước
+            roomCode = data.GetValueOrDefault("roomCode")?.ToString();
+            
+            // Nếu không có, kiểm tra trong "data" nested
+            if (string.IsNullOrEmpty(roomCode) && data.ContainsKey("data"))
+            {
+                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
+                if (nestedData != null)
+                {
+                    roomCode = nestedData.GetValueOrDefault("roomCode")?.ToString();
+                }
+            }
+            
+            // Nếu vẫn không có roomCode, thử lấy từ mapping
+            if (string.IsNullOrEmpty(roomCode))
+            {
+                _socketToRoom.TryGetValue(socketId, out roomCode);
+            }
+            
+            if (string.IsNullOrEmpty(roomCode))
+            {
+                Console.WriteLine($"[SOCKET] Không tìm thấy roomCode cho socketId {socketId}");
+                return;
+            }
+            
+            Console.WriteLine($"[SOCKET] Xử lý request-players-update: socketId={socketId}, roomCode={roomCode}");
+            
+            // Sử dụng shared RoomManagementSocketService
+            if (_roomManagementService != null)
+            {
+                await _roomManagementService.RequestPlayersUpdateAsync(socketId, roomCode);
+            }
+            else
+            {
+                Console.WriteLine($"[SOCKET] RoomManagementService chưa được thiết lập!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SOCKET] Lỗi xử lý request-players-update: {ex.Message}");
         }
     }
 }
