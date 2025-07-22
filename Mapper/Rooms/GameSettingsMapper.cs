@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.DTO.Rooms.Games;
-
+using ConsoleApp1.Model.DTO.Rooms.Games;
 namespace ConsoleApp1.Mapper.Rooms;
-
 public static class GameSettingsMapper
 {
     public static Dictionary<string, string> ToEntity(GameSettingsDTO settings)
@@ -16,7 +14,6 @@ public static class GameSettingsMapper
             { "EnableTimer", settings.EnableTimer.ToString() }
         };
     }
-
     public static GameSettingsDTO ToDTO(Dictionary<string, string> settings)
     {
         return new GameSettingsDTO(

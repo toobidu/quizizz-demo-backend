@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Interface;
-
 public interface IRoomManagementService
 {
     Task<bool> LeaveRoomAsync(int userId, int roomId);

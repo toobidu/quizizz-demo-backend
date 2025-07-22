@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
-
+using ConsoleApp1.Model.DTO.Rooms;
 namespace ConsoleApp1.Service.Interface;
-
 public interface IRoomService
 {
     Task<RoomDTO> JoinRoomAsync(JoinRoomRequest request);

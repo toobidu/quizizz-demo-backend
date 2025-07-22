@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO.Rooms.Games;
-
+namespace ConsoleApp1.Model.DTO.Rooms.Games;
 public class GameStateDTO
 {
     public string RoomCode { get; set; }
@@ -8,7 +7,6 @@ public class GameStateDTO
     public int TotalQuestions { get; set; }
     public List<PlayerInRoomDTO> Players { get; set; }
     public DateTime? QuestionStartTime { get; set; }
-    
     public GameStateDTO(string roomCode, string status, int currentQuestionIndex, 
         int totalQuestions, List<PlayerInRoomDTO> players, DateTime? questionStartTime)
     {

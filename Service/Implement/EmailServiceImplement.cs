@@ -2,24 +2,18 @@ using ConsoleApp1.Config;
 using ConsoleApp1.Service.Interface;
 using System.Net;
 using System.Net.Mail;
-
 namespace ConsoleApp1.Service.Implement;
-
 public class EmailServiceImplement : IEmailService
 {
     private readonly EmailConfig _emailConfig;
-
     public EmailServiceImplement(EmailConfig emailConfig)
     {
         _emailConfig = emailConfig;
     }
-
     public async Task<bool> SendOtpEmailAsync(string toEmail, string otpCode)
     {
         try
         {
-            Console.WriteLine($"[EMAIL_SERVICE] Sending OTP email to: {toEmail}");
-            
             var mailMessage = new MailMessage
             {
                 From = new MailAddress(_emailConfig.FromEmail, _emailConfig.FromName),
@@ -27,32 +21,24 @@ public class EmailServiceImplement : IEmailService
                 /*Body = CreateOtpEmailBody(otpCode),
                 IsBodyHtml = true*/
             };
-            
             mailMessage.To.Add(toEmail);
-
             using var smtpClient = new SmtpClient(_emailConfig.SmtpHost, _emailConfig.SmtpPort)
             {
                 Credentials = new NetworkCredential(_emailConfig.FromEmail, _emailConfig.FromPassword),
                 EnableSsl = _emailConfig.EnableSsl
             };
-
             await smtpClient.SendMailAsync(mailMessage);
-            Console.WriteLine($"[EMAIL_SERVICE] OTP email sent successfully to: {toEmail}");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EMAIL_SERVICE] Error sending OTP email: {ex.Message}");
             return false;
         }
     }
-
     public async Task<bool> SendWelcomeEmailAsync(string toEmail, string username)
     {
         try
         {
-            Console.WriteLine($"[EMAIL_SERVICE] Sending welcome email to: {toEmail}");
-            
             var mailMessage = new MailMessage
             {
                 From = new MailAddress(_emailConfig.FromEmail, _emailConfig.FromName),
@@ -60,26 +46,20 @@ public class EmailServiceImplement : IEmailService
                 /*Body = CreateWelcomeEmailBody(username),
                 IsBodyHtml = true*/
             };
-            
             mailMessage.To.Add(toEmail);
-
             using var smtpClient = new SmtpClient(_emailConfig.SmtpHost, _emailConfig.SmtpPort)
             {
                 Credentials = new NetworkCredential(_emailConfig.FromEmail, _emailConfig.FromPassword),
                 EnableSsl = _emailConfig.EnableSsl
             };
-
             await smtpClient.SendMailAsync(mailMessage);
-            Console.WriteLine($"[EMAIL_SERVICE] Welcome email sent successfully to: {toEmail}");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EMAIL_SERVICE] Error sending welcome email: {ex.Message}");
             return false;
         }
     }
-
     /*private string CreateOtpEmailBody(string otpCode)
     {
         return $@"
@@ -106,7 +86,6 @@ public class EmailServiceImplement : IEmailService
         </body>
         </html>";
     }
-
     private string CreateWelcomeEmailBody(string username)
     {
         return $@"

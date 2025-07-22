@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Users;
+using ConsoleApp1.Model.DTO.Users;
 using ConsoleApp1.Model.Entity.Users;
-
 namespace ConsoleApp1.Mapper.Users;
-
 public static class UserRoleMapper
 {
     public static UserRoleDTO ToDTO(UserRole ur)
@@ -12,7 +10,6 @@ public static class UserRoleMapper
             roleId: ur.RoleId
         );
     }
-
     public static UserRole ToEntity(UserRoleDTO urDto)
     {
         return new UserRole(

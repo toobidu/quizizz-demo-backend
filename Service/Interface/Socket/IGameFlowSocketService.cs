@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Interface.Socket;
-
 public interface IGameFlowSocketService
 {
     Task StartGameAsync(string roomCode);

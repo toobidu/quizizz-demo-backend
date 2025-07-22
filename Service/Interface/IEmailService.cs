@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Interface;
-
 public interface IEmailService
 {
     Task<bool> SendOtpEmailAsync(string toEmail, string otpCode);

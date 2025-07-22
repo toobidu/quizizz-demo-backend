@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
-
+using ConsoleApp1.Model.DTO.Rooms;
 namespace ConsoleApp1.Service.Interface;
-
 public interface IJoinRoomService
 {
     Task<RoomDTO?> JoinPublicRoomAsync(int roomId, int playerId);
@@ -14,7 +12,6 @@ public interface IJoinRoomService
     Task<IEnumerable<PlayerInRoomDTO>> GetPlayersInRoomAsync(int roomId);
     Task<RoomDetailsDTO?> GetRoomDetailsAsync(int roomId);
     Task<bool> StartGameAsync(int roomId, int userId);
-    
     // Broadcast methods
     Task BroadcastRoomPlayersUpdateAsync(string roomCode);
     Task BroadcastPlayerJoinedAsync(string roomCode, int newPlayerId);

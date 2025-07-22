@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Implement.Socket.PlayerInteraction;
-
 /// <summary>
 /// Constants cho Player Interaction Service
 /// </summary>
@@ -18,7 +17,6 @@ public static class PlayerInteractionConstants
         public const string GameCompleted = "game-completed";
         public const string Error = "error";
     }
-
     /// <summary>
     /// Player statuses
     /// </summary>
@@ -31,7 +29,6 @@ public static class PlayerInteractionConstants
         public const string Online = "online";
         public const string Offline = "offline";
     }
-
     /// <summary>
     /// Game completion reasons
     /// </summary>
@@ -41,7 +38,6 @@ public static class PlayerInteractionConstants
         public const string Timeout = "timeout";
         public const string HostEnded = "host-ended";
     }
-
     /// <summary>
     /// Scoring constants
     /// </summary>
@@ -53,7 +49,6 @@ public static class PlayerInteractionConstants
         public const int MinTimeToAnswer = 1;
         public const int DefaultTimeToAnswer = 30;
     }
-
     /// <summary>
     /// Messages
     /// </summary>
@@ -69,7 +64,6 @@ public static class PlayerInteractionConstants
         public const string AllPlayersFinished = "Tất cả người chơi đã hoàn thành!";
         public const string AnswerProcessingError = "Lỗi xử lý câu trả lời";
     }
-
     /// <summary>
     /// Validation limits
     /// </summary>

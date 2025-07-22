@@ -1,8 +1,6 @@
 using ConsoleApp1.Model.DTO.Users;
 using ConsoleApp1.Model.Entity.Users;
-
 namespace ConsoleApp1.Mapper.Users;
-
 public static class UserProfileMapper
 {
     public static UserProfileDTO ToProfileDTO(User user, int highestRank, TimeSpan fastestTime,
@@ -13,7 +11,6 @@ public static class UserProfileMapper
             user.PhoneNumber, user.Address, highestRank,
             fastestTime, highestScore, bestTopic, user.CreatedAt);
     }
-
     public static UserDTO ToBasicDTO(User user)
     {
         return new UserDTO(

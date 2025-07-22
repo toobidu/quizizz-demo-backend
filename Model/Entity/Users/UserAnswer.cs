@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.Entity.Questions;
+using ConsoleApp1.Model.Entity.Questions;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Model.Entity.Users;
-
 public class UserAnswer
 {
     public int UserId { get; set; }
@@ -15,13 +13,10 @@ public class UserAnswer
     public int Score { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    
     // Navigation properties
     public Question? Question { get; set; }
     public GameSession? GameSession { get; set; }
-
     public UserAnswer() { }
-
     public UserAnswer(int userId, int roomId, int questionId, int answerId, 
                      bool isCorrect, TimeSpan timeTaken, int? gameSessionId, int score,
                      DateTime createdAt, DateTime updatedAt)
@@ -37,7 +32,6 @@ public class UserAnswer
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
     }
-    
     public UserAnswer(int userId, int roomId, int questionId, int answerId, 
                      bool isCorrect, TimeSpan timeTaken, DateTime createdAt, DateTime updatedAt)
     {

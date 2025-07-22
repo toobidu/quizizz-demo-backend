@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using ConsoleApp1.Config;
 using ConsoleApp1.Controller;
 using ConsoleApp1.Data;
@@ -14,21 +14,17 @@ using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-
 internal class Program
 {
     private static async Task Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
-
         var config = ConfigLoader.Load();
-
-        // Khởi tạo Redis và JWT helper
+        // Kh?i t?o Redis v� JWT helper
         var redisConn = new RedisConnection(config.Redis);
         var redisService = new RedisServiceImplement(redisConn);
         var jwtHelper = new JwtHelper(config.Security);
-
-        // Khởi tạo Repository (dữ liệu từ PostgreSQL)
+        // Kh?i t?o Repository (d? li?u t? PostgreSQL)
         string dbConnection = config.ConnectionStrings["DefaultConnection"];
         IUserRepository userRepo = new UserRepositoryImplement(dbConnection);
         IRoleRepository roleRepo = new RoleRepositoryImplement(dbConnection);
@@ -36,33 +32,32 @@ internal class Program
         IRolePermissionRepository rolePermissionRepo = new RolePermissionRepositoryImplement(dbConnection);
         IPermissionRepository permissionRepo = new PermissionRepositoryImplement(dbConnection);
         IUserAnswerRepository userAnswerRepo = new UserAnswerRepositoryImplement(dbConnection);
+        IAnswerRepository answerRepo = new AnswerRepositoryImplement(dbConnection);
         IRankRepository rankRepo = new RankRepositoryImplement(dbConnection);
         ITopicRepository topicRepo = new TopicRepositoryImplement(dbConnection);
-
-        // Khởi tạo Repository cho Room
+        IQuestionRepository questionRepo = new QuestionRepositoryImplement(dbConnection);
+        
+        // Kh?i t?o Repository cho Room
         IRoomRepository roomRepo = new RoomRepositoryImplement(dbConnection);
         IRoomPlayerRepository roomPlayerRepo = new RoomPlayerRepositoryImplement(dbConnection);
         IRoomSettingsRepository roomSettingsRepo = new RoomSettingsRepositoryImplement(dbConnection);
-        
-        // Khởi tạo Repository cho các bảng mới
+        // Kh?i t?o Repository cho c�c b?ng m?i
         var databaseHelper = new DatabaseHelper(dbConnection);
         IGameSessionRepository gameSessionRepo = new GameSessionRepositoryImplement(databaseHelper);
         IGameQuestionRepository gameQuestionRepo = new GameQuestionRepositoryImplement(databaseHelper);
         ISocketConnectionRepository socketConnectionRepo = new SocketConnectionRepositoryImplement(databaseHelper);
-
-        // Khởi tạo EmailConfig và EmailService
+        // Kh?i t?o EmailConfig v� EmailService
         var emailConfig = new EmailConfig
         {
-            FromEmail = "dungto0300567@gmail.com", // Email thật
-            FromPassword = "your-app-password", // Cần App Password từ Google
+            FromEmail = "dungto0300567@gmail.com", // Email th?t
+            FromPassword = "your-app-password", // C?n App Password t? Google
             FromName = "Quizizz App",
             SmtpHost = "smtp.gmail.com",
             SmtpPort = 587,
             EnableSsl = true
         };
         IEmailService emailService = new EmailServiceImplement(emailConfig);
-
-        // Khởi tạo Service
+        // Kh?i t?o Service
         IAuthService authService = new AuthServiceImplement(
             userRepo, permissionRepo, roleRepo, userRoleRepo, redisService, emailService, jwtHelper,
             config.Security
@@ -75,27 +70,23 @@ internal class Program
         IPermissionService permissionService = new PermissionServiceImplement(permissionRepo);
         IUserService userService = new UserServiceImplement(userRepo, userRoleRepo, roleRepo);
         IUserProfileService userProfileService = new UserProfileServiceImplement(userRepo, userAnswerRepo, rankRepo, topicRepo);
-        
-        // Khởi tạo Service cho các bảng mới
+        // Kh?i t?o Service cho c�c b?ng m?i
         IGameSessionService gameSessionService = new GameSessionServiceImplement(gameSessionRepo, gameQuestionRepo, null);
         ISocketConnectionDbService socketConnectionDbService = new SocketConnectionDbServiceImplement(socketConnectionRepo);
-        // Khởi tạo shared dictionaries cho WebSocket services
+        // Kh?i t?o shared dictionaries cho WebSocket services
         var gameRooms = new ConcurrentDictionary<string, GameRoom>();
         var webSocketConnections = new ConcurrentDictionary<string, WebSocket>();
         var socketToRoom = new ConcurrentDictionary<string, string>();
-        
-        // Khởi tạo các WebSocket service con với shared dictionaries
+        // Kh?i t?o c�c WebSocket service con v?i shared dictionaries
         var socketConnectionSocketService = new ConsoleApp1.Service.Implement.Socket.SocketConnectionServiceImplement(webSocketConnections, socketToRoom);
         var roomManagementSocketService = new RoomManagementSocketServiceImplement(gameRooms, socketToRoom, webSocketConnections);
-        IGameFlowSocketService gameFlowSocketService = new GameFlowSocketServiceImplement();
-        IPlayerInteractionSocketService playerInteractionSocketService = new PlayerInteractionSocketServiceImplement();
-        IScoringSocketService scoringSocketService = new ScoringSocketServiceImplement();
+        IGameFlowSocketService gameFlowSocketService = new GameFlowSocketServiceImplement(gameRooms, webSocketConnections);
+        IPlayerInteractionSocketService playerInteractionSocketService = new PlayerInteractionSocketServiceImplement(gameRooms, webSocketConnections);
+        IScoringSocketService scoringSocketService = new ScoringSocketServiceImplement(gameRooms, webSocketConnections);
         IHostControlSocketService hostControlSocketService = new HostControlSocketServiceImplement(gameRooms, webSocketConnections);
-        
-        // Thiết lập reference giữa các service
+        // Thi?t l?p reference gi?a c�c service
         socketConnectionSocketService.SetRoomManagementService(roomManagementSocketService);
-        
-        // Khởi tạo composite SocketService với tất cả dependency
+        // Kh?i t?o composite SocketService v?i t?t c? dependency
         ISocketService socketService = new SocketServiceImplement(
             socketConnectionSocketService,
             roomManagementSocketService,
@@ -104,21 +95,18 @@ internal class Program
             scoringSocketService,
             hostControlSocketService
         );
-        // Khởi tạo BroadcastService trước (không cần joinRoomService):
+        // Kh?i t?o BroadcastService tru?c (kh�ng c?n joinRoomService):
         IBroadcastService broadcastService = new BroadcastServiceImplement(
-            socketService, roomRepo, roomPlayerRepo, userRepo, null!); // Tạm thời null
-
+            socketService, roomRepo, roomPlayerRepo, userRepo, null!); // T?m th?i null
         ICreateRoomService createRoomService = new CreateRoomServiceImplement(
             roomRepo, roomSettingsRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, broadcastService, socketService);
         IJoinRoomService joinRoomService = new JoinRoomServiceImplement(
             roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService, socketService, broadcastService);
         IRoomManagementService roomManagementService = new RoomManagementServiceImplement(
             roomRepo, roomPlayerRepo, roomSettingsRepo, userRepo);
-
-        // Cập nhật joinRoomService cho BroadcastService:
+        // C?p nh?t joinRoomService cho BroadcastService:
         ((BroadcastServiceImplement)broadcastService).SetJoinRoomService(joinRoomService);
-
-        // Khởi tạo Controller:
+        // Kh?i t?o Controller:
         var authController = new AuthController(authService, jwtHelper);
         var forgotPasswordController = new ForgotPasswordController(authService);
         var rolePermissionController = new RolePermissionController(rolePermissionService, authorizationService, jwtHelper);
@@ -131,10 +119,10 @@ internal class Program
         var leaveRoomController = new LeaveRoomController(joinRoomService, authorizationService);
         var gameController = new GameController(socketService, joinRoomService);
         var topicController = new TopicController(topicRepo);
+        var questionController = new QuestionController(questionRepo, roomRepo, answerRepo);
         var gameSessionController = new GameSessionController(gameSessionService);
         var socketConnectionController = new SocketConnectionController(socketConnectionDbService);
-
-        // Khởi tạo Router cho từng Controller:
+        // Kh?i t?o Router cho t?ng Controller:
         var authRouter = new AuthRouter(authController);
         var forgotPasswordRouter = new ForgotPasswordRouter(forgotPasswordController);
         var rolePermissionRouter = new RolePermissionRouter(rolePermissionController);
@@ -145,18 +133,13 @@ internal class Program
         var createRoomRouter = new CreateRoomRouter(createRoomController, jwtHelper);
         var joinRoomRouter = new JoinRoomRouter(joinRoomController, jwtHelper);
         var leaveRoomRouter = new LeaveRoomRouter(leaveRoomController, jwtHelper);
-        var gameRouter = new GameRouter(gameController);
+        var gameRouter = new GameRouter(gameController, questionController);
         var topicRouter = new TopicRouter(topicController);
         var gameSessionRouter = new GameSessionRouter(gameSessionController);
         var socketConnectionRouter = new SocketConnectionRouter(socketConnectionController);
-
-        // Khởi động Socket.IO server
-        Console.WriteLine("[Máy chủ] Đang khởi động máy chủ Socket.IO trên cổng 3001...");
+        // Kh?i d?ng Socket.IO server
         await socketService.StartAsync(3001);
-        Console.WriteLine("[Máy chủ] Máy chủ Socket.IO đã khởi động thành công trên cổng 3001");
-        
-        // Đăng ký tất cả router vào HttpServer
-        Console.WriteLine("[Máy chủ] Đang khởi tạo máy chủ HTTP tại http://localhost:5000/");
+        // �ang k� t?t c? router v�o HttpServer
         var server = new HttpServer(
             "http://localhost:5000/",
             authRouter,
@@ -174,11 +157,6 @@ internal class Program
             gameSessionRouter,
             socketConnectionRouter
         );
-
-        Console.WriteLine("[Máy chủ] Đang khởi động máy chủ HTTP...");
-        Console.WriteLine("[Máy chủ] ===========================================");
-        Console.WriteLine("[Máy chủ] QUAN TRỌNG: Frontend nên kết nối đến http://localhost:5000, KHÔNG phải cổng 8080!");
-        Console.WriteLine("[Máy chủ] ===========================================");
         await server.StartAsync();
     }
 }

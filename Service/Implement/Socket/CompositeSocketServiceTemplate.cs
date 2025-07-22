@@ -1,8 +1,6 @@
 using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Service.Interface.Socket;
-
 namespace ConsoleApp1.Service.Implement.Socket;
-
 /// <summary>
 /// Template cho Composite Socket Service - Đây là file mẫu
 /// File thực tế đang sử dụng là SocketServiceImplement.cs ở thư mục cha
@@ -15,7 +13,6 @@ public class CompositeSocketServiceTemplate : ISocketService
     private readonly IPlayerInteractionSocketService _playerInteractionService;
     private readonly IScoringSocketService _scoringService;
     private readonly IHostControlSocketService _hostControlService;
-
     public CompositeSocketServiceTemplate(
         Interface.Socket.ISocketConnectionService connectionService,
         IRoomManagementSocketService roomManagementService,
@@ -31,11 +28,9 @@ public class CompositeSocketServiceTemplate : ISocketService
         _scoringService = scoringService;
         _hostControlService = hostControlService;
     }
-
     // ISocketConnectionService
     public async Task StartAsync(int port) => await _connectionService.StartAsync(port);
     public async Task StopAsync() => await _connectionService.StopAsync();
-
     // IRoomManagementSocketService
     public async Task JoinRoomAsync(string socketId, string roomCode, string username, int userId) 
         => await _roomManagementService.JoinRoomAsync(socketId, roomCode, username, userId);
@@ -55,7 +50,6 @@ public class CompositeSocketServiceTemplate : ISocketService
         => await _roomManagementService.RequestPlayersUpdateAsync(socketId, roomCode);
     public async Task<ConsoleApp1.Model.DTO.Game.GameRoom?> GetRoomAsync(string roomCode)
         => await _roomManagementService.GetRoomAsync(roomCode);
-
     // IGameFlowSocketService
     public async Task StartGameAsync(string roomCode) => await _gameFlowService.StartGameAsync(roomCode);
     public async Task StartGameWithQuestionsAsync(string roomCode, object questions, int gameTimeLimit) 
@@ -76,13 +70,11 @@ public class CompositeSocketServiceTemplate : ISocketService
         => await _gameFlowService.UpdateGameStateAsync(roomCode, gameState);
     public async Task SendCountdownAsync(string roomCode, int countdown) 
         => await _gameFlowService.SendCountdownAsync(roomCode, countdown);
-
     // IPlayerInteractionSocketService
     public async Task ReceiveAnswerAsync(string roomCode, string username, object answer, long timestamp) 
         => await _playerInteractionService.ReceiveAnswerAsync(roomCode, username, answer, timestamp);
     public async Task UpdatePlayerStatusAsync(string roomCode, string username, string status) 
         => await _playerInteractionService.UpdatePlayerStatusAsync(roomCode, username, status);
-
     // IScoringSocketService
     public async Task UpdateScoreboardAsync(string roomCode, object scoreboard) 
         => await _scoringService.UpdateScoreboardAsync(roomCode, scoreboard);
@@ -92,7 +84,6 @@ public class CompositeSocketServiceTemplate : ISocketService
         => await _scoringService.EndGameAsync(roomCode, finalResults);
     public async Task SendScoreboardAsync(string roomCode, object scoreboard) 
         => await _scoringService.SendScoreboardAsync(roomCode, scoreboard);
-
     // IHostControlSocketService
     public async Task NotifyHostOnlyAsync(string roomCode, string message) 
         => await _hostControlService.NotifyHostOnlyAsync(roomCode, message);

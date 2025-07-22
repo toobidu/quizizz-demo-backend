@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Model.DTO.Rooms.Games;
-
 public class GameSessionDTO
 {
     public int Id { get; set; }

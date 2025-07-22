@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.Entity.Questions;
-
+namespace ConsoleApp1.Model.Entity.Questions;
 public class Rank
 {
     public int Id { get; set; }
@@ -8,9 +7,7 @@ public class Rank
     public int GamesPlayed { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-
     public Rank() { }
-
     public Rank(int id, int userId, int totalScore, int gamesPlayed, 
                DateTime createdAt, DateTime updatedAt)
     {

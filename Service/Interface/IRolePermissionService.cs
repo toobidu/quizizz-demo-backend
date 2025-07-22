@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Service.Interface;
-
+namespace ConsoleApp1.Service.Interface;
 public interface IRolePermissionService
 {
     Task AddPermissionToRoleAsync(int roleId, int permissionId);

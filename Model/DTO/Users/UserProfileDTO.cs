@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Model.DTO.Users;
-
 public class UserProfileDTO
 {
     public int Id { get; set; }
@@ -14,7 +13,6 @@ public class UserProfileDTO
     public string BestTopic { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool IsOwnProfile { get; set; } = false; // Đánh dấu có phải profile của chính mình không
-
     public UserProfileDTO(int id, string username, string fullName, string email, 
                          string phoneNumber, string address, int highestRank, 
                          TimeSpan fastestTime, int highestScore, string bestTopic, DateTime createdAt) =>

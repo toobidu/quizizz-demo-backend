@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.DTO.Game;
-
 namespace ConsoleApp1.Service.Interface.Socket;
-
 public interface IRoomManagementSocketService
 {
     Task JoinRoomAsync(string socketId, string roomCode, string username, int userId);

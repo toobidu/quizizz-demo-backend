@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Config;
-
 public static class DatabaseConfig
 {
     public static string GetConnectionString()

@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Implement.Socket.Scoring;
-
 /// <summary>
 /// Constants và cấu hình cho Scoring Service
 /// </summary>
@@ -17,7 +16,6 @@ public static class ScoringConstants
         public const string PersonalScoreboard = "personal-scoreboard";
         public const string PersonalFinalResult = "personal-final-result";
     }
-
     /// <summary>
     /// Achievement types
     /// </summary>
@@ -27,7 +25,6 @@ public static class ScoringConstants
         public const string SpeedDemon = "Speed Demon";
         public const string StreakMaster = "Streak Master";
     }
-
     /// <summary>
     /// Achievement icons
     /// </summary>
@@ -37,7 +34,6 @@ public static class ScoringConstants
         public const string Lightning = "⚡";
         public const string Fire = "🔥";
     }
-
     /// <summary>
     /// Scoring thresholds
     /// </summary>
@@ -47,7 +43,6 @@ public static class ScoringConstants
         public const int SessionCleanupDelayMinutes = 5;
         public const int GameStartTimeEstimateMinutes = 10;
     }
-
     /// <summary>
     /// Game states
     /// </summary>
@@ -57,7 +52,6 @@ public static class ScoringConstants
         public const string Active = "active";
         public const string Waiting = "waiting";
     }
-
     /// <summary>
     /// Scoreboard types
     /// </summary>
@@ -67,7 +61,6 @@ public static class ScoringConstants
         public const string Final = "final";
         public const string Personal = "personal";
     }
-
     /// <summary>
     /// Position change types
     /// </summary>

@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Users;
-
 namespace ConsoleApp1.Mapper.Questions;
-
 public static class UserAnswerMapper
 {
     public static UserAnswerDTO ToDTO(UserAnswer answer)
@@ -15,7 +13,6 @@ public static class UserAnswerMapper
             timeTaken: answer.TimeTaken
         );
     }
-
     public static UserAnswer ToEntity(UserAnswerDTO dto)
     {
         return new UserAnswer(

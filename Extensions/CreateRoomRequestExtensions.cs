@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.DTO.Rooms;
-
 namespace ConsoleApp1.Extensions;
-
 public static class CreateRoomRequestExtensions
 {
     public static bool IsValid(this CreateRoomRequest request)

@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Users;
+using ConsoleApp1.Model.DTO.Users;
 using ConsoleApp1.Model.Entity.Users;
-
 namespace ConsoleApp1.Mapper.Users;
-
 public static class UserMapper
 {
     public static UserDTO ToDTO(User user)
@@ -18,7 +16,6 @@ public static class UserMapper
             typeAccount: user.TypeAccount
         );
     }
-
     public static User ToEntity(UserDTO userDto)
     {
         return new User(

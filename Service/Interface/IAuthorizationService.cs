@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Service.Interface;
-
+namespace ConsoleApp1.Service.Interface;
 public interface IAuthorizationService
 {
     Task<bool> HasPermissionAsync(int userId, string permission);

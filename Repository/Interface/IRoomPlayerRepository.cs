@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.Entity.Rooms;
-
+using ConsoleApp1.Model.Entity.Rooms;
 namespace ConsoleApp1.Repository.Interface;
-
 public interface IRoomPlayerRepository
 {
     Task<RoomPlayer?> GetByUserIdAndRoomIdAsync(int userId, int roomId);

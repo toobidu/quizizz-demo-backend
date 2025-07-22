@@ -1,9 +1,7 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-
 namespace ConsoleApp1.Service.Implement.Socket.RoomManagement;
-
 /// <summary>
 /// Service quản lý rooms và players
 /// </summary>
@@ -13,7 +11,6 @@ public class RoomManager
     private readonly ConcurrentDictionary<string, string> _socketToRoom;
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
     private readonly RoomValidator _validator;
-
     public RoomManager(
         ConcurrentDictionary<string, GameRoom> gameRooms,
         ConcurrentDictionary<string, string> socketToRoom,
@@ -24,7 +21,6 @@ public class RoomManager
         _connections = connections;
         _validator = new RoomValidator();
     }
-
     /// <summary>
     /// Tạo hoặc lấy room
     /// </summary>
@@ -33,11 +29,9 @@ public class RoomManager
         if (!_gameRooms.ContainsKey(roomCode))
         {
             _gameRooms[roomCode] = new GameRoom { RoomCode = roomCode };
-            Console.WriteLine($"[ROOM] Created new game room: {roomCode}");
         }
         return _gameRooms[roomCode];
     }
-
     /// <summary>
     /// Thêm player vào room
     /// </summary>
@@ -47,38 +41,28 @@ public class RoomManager
         // Validate inputs
         if (!_validator.IsValidRoomCode(roomCode))
             return (false, "Mã phòng không hợp lệ", null);
-
         if (!_validator.IsValidUsername(username))
             return (false, "Tên người chơi không hợp lệ", null);
-
         if (!_validator.IsValidUserId(userId))
             return (false, "ID người chơi không hợp lệ", null);
-
         if (!_validator.IsValidSocketId(socketId))
             return (false, "Socket connection không hợp lệ", null);
-
         var gameRoom = GetOrCreateRoom(roomCode);
-
         // Kiểm tra có thể join không
         var (canJoin, reason) = _validator.CanJoinRoom(gameRoom, userId);
         if (!canJoin && !_validator.IsPlayerExistsInRoom(gameRoom, userId))
         {
             return (false, reason, null);
         }
-
         // Lưu mapping socketId -> roomCode
         _socketToRoom[socketId] = roomCode;
-
         // Kiểm tra player đã tồn tại
         var existingPlayer = gameRoom.Players.FirstOrDefault(p => p.UserId == userId);
         if (existingPlayer != null)
         {
-            Console.WriteLine($"[ROOM] Người chơi {username} (ID: {userId}) đã tồn tại, đang cập nhật socket");
-            
             // Xóa mapping socketId cũ -> roomCode nếu có
             if (!string.IsNullOrEmpty(existingPlayer.SocketId))
             {
-                Console.WriteLine($"[ROOM] Xóa socket cũ {existingPlayer.SocketId} cho người chơi {username} (ID: {userId})");
                 _socketToRoom.TryRemove(existingPlayer.SocketId, out _);
                 // Xóa khỏi _connections nếu cần
                 if (_connections.ContainsKey(existingPlayer.SocketId))
@@ -86,11 +70,9 @@ public class RoomManager
                     _connections.TryRemove(existingPlayer.SocketId, out _);
                 }
             }
-            
             existingPlayer.SocketId = socketId;
             return (true, "Cập nhật kết nối thành công", existingPlayer);
         }
-
         // Tạo player mới
         var isFirstPlayer = gameRoom.Players.Count == 0;
         var player = new GamePlayer
@@ -101,16 +83,10 @@ public class RoomManager
             IsHost = isFirstPlayer,
             JoinTime = DateTime.UtcNow
         };
-
         gameRoom.Players.Add(player);
-
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        Console.WriteLine($"[{timestamp}] WEBSOCKET JOIN - Room {roomCode}: {username} (ID: {userId}) joined as {(player.IsHost ? "HOST" : "player")}");
-        Console.WriteLine($"[{timestamp}] WEBSOCKET ROOM STATUS - Room {roomCode}: {gameRoom.Players.Count} players connected | Host: {gameRoom.Players.FirstOrDefault(p => p.IsHost)?.Username}");
-
         return (true, $"Chào mừng {username} đến phòng {roomCode}!", player);
     }
-
     /// <summary>
     /// Xóa player khỏi room
     /// </summary>
@@ -119,19 +95,14 @@ public class RoomManager
     {
         if (!_gameRooms.ContainsKey(roomCode))
         {
-            Console.WriteLine($"[ROOM] Phòng {roomCode} không tồn tại khi cố gắng xóa người chơi");
             return (false, "Phòng không tồn tại", null, null);
         }
-
         var gameRoom = _gameRooms[roomCode];
         var player = gameRoom.Players.FirstOrDefault(p => p.SocketId == socketId);
-
         if (player == null)
         {
-            Console.WriteLine($"[ROOM] Không tìm thấy người chơi với socketId {socketId} trong phòng {roomCode}");
             return (false, "Player không tồn tại trong phòng", null, null);
         }
-
         // Lưu thông tin người chơi trước khi xóa
         var playerToRemove = new GamePlayer
         {
@@ -143,41 +114,28 @@ public class RoomManager
             Status = player.Status,
             JoinTime = player.JoinTime
         };
-
         // Xóa player
         gameRoom.Players.Remove(player);
         _socketToRoom.TryRemove(socketId, out _);
-
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        Console.WriteLine($"[{timestamp}] WEBSOCKET LEAVE - Room {roomCode}: {playerToRemove.Username} (ID: {playerToRemove.UserId}) left");
-        Console.WriteLine($"[{timestamp}] PLAYER COUNT - Room {roomCode}: {gameRoom.Players.Count} players remaining");
-
         GamePlayer? newHost = null;
-
         // Xử lý chuyển host nếu cần
         if (playerToRemove.IsHost && gameRoom.Players.Count > 0)
         {
             newHost = gameRoom.Players.OrderBy(p => p.JoinTime ?? DateTime.MaxValue).First();
             newHost.IsHost = true;
-            Console.WriteLine($"[{timestamp}] HOST TRANSFER - Room {roomCode}: {newHost.Username} is now the host");
         }
-
         // Xóa room nếu không còn ai
         if (gameRoom.Players.Count == 0)
         {
             _gameRooms.TryRemove(roomCode, out _);
-            Console.WriteLine($"[{timestamp}] ROOM DELETED - Room {roomCode}: No players remaining");
-            Console.WriteLine($"[ROOM] Game session cleanup needed for empty room {roomCode}");
         }
         else
         {
             // Log danh sách người chơi còn lại
-            Console.WriteLine($"[{timestamp}] REMAINING PLAYERS - Room {roomCode}: {string.Join(", ", gameRoom.Players.Select(p => p.Username))}");
         }
-
         return (true, "Player đã rời phòng", playerToRemove, newHost);
     }
-
     /// <summary>
     /// Lấy thông tin players trong room
     /// </summary>
@@ -185,7 +143,6 @@ public class RoomManager
     {
         if (!_gameRooms.TryGetValue(roomCode, out var gameRoom))
             return new List<RoomPlayerInfo>();
-
         return gameRoom.Players.Select(p => new RoomPlayerInfo
         {
             Username = p.Username,
@@ -197,7 +154,6 @@ public class RoomManager
                       ws.State == WebSocketState.Open
         }).ToList();
     }
-
     /// <summary>
     /// Kiểm tra room có tồn tại không
     /// </summary>
@@ -205,7 +161,6 @@ public class RoomManager
     {
         return _gameRooms.ContainsKey(roomCode);
     }
-    
     /// <summary>
     /// Xóa player khỏi room theo userId thay vì socketId
     /// Sử dụng khi cần xóa người chơi dựa trên userId (ví dụ: khi gọi từ HTTP API)
@@ -215,19 +170,14 @@ public class RoomManager
     {
         if (!_gameRooms.ContainsKey(roomCode))
         {
-            Console.WriteLine($"[ROOM] Phòng {roomCode} không tồn tại khi cố gắng xóa người chơi theo userId");
             return (false, "Phòng không tồn tại", null, null);
         }
-
         var gameRoom = _gameRooms[roomCode];
         var player = gameRoom.Players.FirstOrDefault(p => p.UserId == userId);
-
         if (player == null)
         {
-            Console.WriteLine($"[ROOM] Không tìm thấy người chơi với userId {userId} trong phòng {roomCode}");
             return (false, "Player không tồn tại trong phòng", null, null);
         }
-
         // Lưu thông tin người chơi trước khi xóa
         var playerToRemove = new GamePlayer
         {
@@ -239,46 +189,32 @@ public class RoomManager
             Status = player.Status,
             JoinTime = player.JoinTime
         };
-        
         // Xóa mapping socketId -> roomCode nếu có
         if (!string.IsNullOrEmpty(player.SocketId))
         {
             _socketToRoom.TryRemove(player.SocketId, out _);
         }
-
         // Xóa player
         gameRoom.Players.Remove(player);
-
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        Console.WriteLine($"[{timestamp}] USER ID LEAVE - Room {roomCode}: {playerToRemove.Username} (ID: {playerToRemove.UserId}) left");
-        Console.WriteLine($"[{timestamp}] PLAYER COUNT - Room {roomCode}: {gameRoom.Players.Count} players remaining");
-
         GamePlayer? newHost = null;
-
         // Xử lý chuyển host nếu cần
         if (playerToRemove.IsHost && gameRoom.Players.Count > 0)
         {
             newHost = gameRoom.Players.OrderBy(p => p.JoinTime ?? DateTime.MaxValue).First();
             newHost.IsHost = true;
-            Console.WriteLine($"[{timestamp}] HOST TRANSFER - Room {roomCode}: {newHost.Username} is now the host");
         }
-
         // Xóa room nếu không còn ai
         if (gameRoom.Players.Count == 0)
         {
             _gameRooms.TryRemove(roomCode, out _);
-            Console.WriteLine($"[{timestamp}] ROOM DELETED - Room {roomCode}: No players remaining");
-            Console.WriteLine($"[ROOM] Game session cleanup needed for empty room {roomCode}");
         }
         else
         {
             // Log danh sách người chơi còn lại
-            Console.WriteLine($"[{timestamp}] REMAINING PLAYERS - Room {roomCode}: {string.Join(", ", gameRoom.Players.Select(p => p.Username))}");
         }
-
         return (true, "Player đã rời phòng", playerToRemove, newHost);
     }
-
     /// <summary>
     /// Lấy room
     /// </summary>
@@ -287,7 +223,6 @@ public class RoomManager
         _gameRooms.TryGetValue(roomCode, out var room);
         return room;
     }
-
     /// <summary>
     /// Lấy tổng số rooms
     /// </summary>
@@ -295,7 +230,6 @@ public class RoomManager
     {
         return _gameRooms.Count;
     }
-
     /// <summary>
     /// Lấy tổng số players online
     /// </summary>

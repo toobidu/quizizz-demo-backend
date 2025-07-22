@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Config;
-
+namespace ConsoleApp1.Config;
 public class SecurityConfig
 {
     public string JwtKey { get; set; } = string.Empty;

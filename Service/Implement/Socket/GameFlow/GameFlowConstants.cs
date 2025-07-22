@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Implement.Socket.GameFlow;
-
 /// <summary>
 /// Constants cho Game Flow Service
 /// </summary>
@@ -21,7 +20,6 @@ public static class GameFlowConstants
         public const string GameEnded = "game-ended";
         public const string GameStateChanged = "game-state-changed";
     }
-
     /// <summary>
     /// Game states
     /// </summary>
@@ -33,7 +31,6 @@ public static class GameFlowConstants
         public const string Ended = "ended";
         public const string QuestionActive = "question-active";
     }
-
     /// <summary>
     /// Game end reasons
     /// </summary>
@@ -44,7 +41,6 @@ public static class GameFlowConstants
         public const string HostEnded = "host-ended";
         public const string Error = "error";
     }
-
     /// <summary>
     /// Default values
     /// </summary>
@@ -55,7 +51,6 @@ public static class GameFlowConstants
         public const int TimerUpdateInterval = 1; // 1 second
         public const int CleanupDelaySeconds = 10;
     }
-
     /// <summary>
     /// Thông báo hệ thống
     /// </summary>
@@ -76,7 +71,6 @@ public static class GameFlowConstants
         public const string GamePaused = "Game đã được tạm dừng";
         public const string GameResumed = "Game đã được tiếp tục";
     }
-
     /// <summary>
     /// Limits
     /// </summary>

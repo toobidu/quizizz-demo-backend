@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Config;
-
+namespace ConsoleApp1.Config;
 public class RedisConfig
 {
     public string ConnectionString { get; set; } = string.Empty;

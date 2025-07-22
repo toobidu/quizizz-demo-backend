@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity;
 using ConsoleApp1.Model.Entity.Questions;
-
 namespace ConsoleApp1.Repository.Interface;
-
 public interface ITopicRepository
 {
     Task<Topic?> GetByIdAsync(int id);

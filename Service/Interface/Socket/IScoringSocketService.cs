@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Interface.Socket;
-
 public interface IScoringSocketService
 {
     Task UpdateScoreboardAsync(string roomCode, object scoreboard);

@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Mapper.Rooms;
-
 public static class RoomMapper
 {
     public static RoomDTO ToDTO(Room room)
@@ -17,7 +15,6 @@ public static class RoomMapper
             status: room.Status
         );
     }
-
     public static Room ToEntity(RoomDTO roomDto)
     {
         return new Room(
@@ -32,7 +29,6 @@ public static class RoomMapper
             updatedAt: DateTime.UtcNow  
         );
     }
-
     public static RoomSummaryDTO ToSummaryDTO(Room room, int playerCount, string? topicName = null, int questionCount = 0, int countdownTime = 0)
     {
         return new RoomSummaryDTO(

@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.DTO.Game;
-
 namespace ConsoleApp1.Service.Implement.Socket.HostControl;
-
 /// <summary>
 /// Helper class cung cấp các utility methods cho host control
 /// Chịu trách nhiệm tạo thông tin điều khiển và trạng thái cho host
@@ -16,7 +14,6 @@ public static class HostControlHelper
     public static object GetAvailableHostControls(GameRoom gameRoom)
     {
         var controls = new List<object>();
-
         // Điều khiển cơ bản luôn có sẵn
         controls.Add(new { 
             action = "kick-player", 
@@ -24,14 +21,12 @@ public static class HostControlHelper
             description = "Đuổi người chơi khỏi phòng",
             enabled = gameRoom.Players.Count > 1 
         });
-        
         controls.Add(new { 
             action = "transfer-host", 
             label = "Transfer Host", 
             description = "Chuyển quyền host cho người khác",
             enabled = gameRoom.Players.Count > 1 
         });
-
         // Điều khiển game dựa trên trạng thái hiện tại
         switch (gameRoom.GameState.ToLower())
         {
@@ -44,7 +39,6 @@ public static class HostControlHelper
                     enabled = gameRoom.Players.Count >= 1 
                 });
                 break;
-                
             case "playing":
             case "question":
                 controls.Add(new { 
@@ -66,7 +60,6 @@ public static class HostControlHelper
                     enabled = true 
                 });
                 break;
-                
             case "paused":
                 controls.Add(new { 
                     action = "resume-game", 
@@ -81,7 +74,6 @@ public static class HostControlHelper
                     enabled = true 
                 });
                 break;
-                
             case "finished":
                 controls.Add(new { 
                     action = "restart-game", 
@@ -97,14 +89,12 @@ public static class HostControlHelper
                 });
                 break;
         }
-
         return new {
             availableControls = controls,
             totalControls = controls.Count,
             gameState = gameRoom.GameState
         };
     }
-
     /// <summary>
     /// Lấy trạng thái phòng chi tiết dành riêng cho host
     /// Bao gồm thông tin mà chỉ host mới cần biết
@@ -123,24 +113,20 @@ public static class HostControlHelper
             isOnline = !string.IsNullOrEmpty(p.SocketId),
             lastActivity = GetPlayerLastActivity(p)
         }).ToList();
-
         var roomStatus = new {
             // Thông tin cơ bản
             roomCode = gameRoom.RoomCode,
             gameState = gameRoom.GameState,
             createdAt = gameRoom.CreatedAt,
-            
             // Thông tin người chơi
             totalPlayers = gameRoom.Players.Count,
             onlinePlayers = gameRoom.Players.Count(p => !string.IsNullOrEmpty(p.SocketId)),
             players = playerStats,
-            
             // Thông tin game
             currentQuestionIndex = gameRoom.CurrentQuestionIndex,
             totalQuestions = gameRoom.TotalQuestions,
             gameProgress = gameRoom.TotalQuestions > 0 ? 
                 (double)gameRoom.CurrentQuestionIndex / gameRoom.TotalQuestions * 100 : 0,
-            
             // Thông tin host (nếu có session)
             hostInfo = hostSession != null ? new {
                 currentHost = hostSession.CurrentHostUsername,
@@ -156,10 +142,8 @@ public static class HostControlHelper
                     })
             } : null
         };
-
         return roomStatus;
     }
-
     /// <summary>
     /// Tạo thông báo chi tiết cho host
     /// </summary>
@@ -173,13 +157,10 @@ public static class HostControlHelper
             message = message,
             timestamp = DateTime.UtcNow,
             roomCode = gameRoom.RoomCode,
-            
             // Thông tin điều khiển
             hostControls = GetAvailableHostControls(gameRoom),
-            
             // Trạng thái phòng
             roomStatus = GetRoomStatusForHost(gameRoom, hostSession),
-            
             // Thống kê nhanh
             quickStats = new {
                 playerCount = gameRoom.Players.Count,
@@ -189,7 +170,6 @@ public static class HostControlHelper
             }
         };
     }
-
     /// <summary>
     /// Lấy thời gian hoạt động cuối của player
     /// </summary>
@@ -201,7 +181,6 @@ public static class HostControlHelper
         // Hiện tại trả về join time
         return player.JoinTime ?? DateTime.UtcNow;
     }
-
     /// <summary>
     /// Kiểm tra xem hành động có hợp lệ trong trạng thái hiện tại không
     /// </summary>

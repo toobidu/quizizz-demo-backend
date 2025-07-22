@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.Entity.Questions;
-
+namespace ConsoleApp1.Model.Entity.Questions;
 public class Question
 {
     public int Id { get; set; }
@@ -8,9 +7,7 @@ public class Question
     public int? QuestionTypeId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-
     public Question() { }
-
     public Question(int id, string questionText, int? topicId, int? questionTypeId, 
                    DateTime createdAt, DateTime updatedAt)
     {

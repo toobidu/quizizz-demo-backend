@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Model.DTO.Game;
-
 public class GamePlayer
 {
     public string Username { get; set; } = string.Empty;
@@ -10,7 +9,6 @@ public class GamePlayer
     public bool IsHost { get; set; } = false;
     public DateTime? JoinTime { get; set; }
 }
-
 public class GameRoom
 {
     public string RoomCode { get; set; } = string.Empty;
@@ -22,7 +20,6 @@ public class GameRoom
     public int QuestionTimeLimit { get; set; } = 30;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
-
 public class PlayerAnswer
 {
     public string Username { get; set; } = string.Empty;
@@ -34,7 +31,6 @@ public class PlayerAnswer
     public int PointsEarned { get; set; }
     public int QuestionIndex { get; set; }
 }
-
 public class QuestionData
 {
     public int QuestionId { get; set; }
@@ -44,7 +40,6 @@ public class QuestionData
     public string Type { get; set; } = "multiple_choice"; // multiple_choice, true_false
     public string Topic { get; set; } = string.Empty;
 }
-
 public class ScoreboardEntry
 {
     public string Username { get; set; } = string.Empty;
@@ -53,21 +48,18 @@ public class ScoreboardEntry
     public int CorrectAnswers { get; set; }
     public double AverageTime { get; set; }
 }
-
 public class HostChangeEventData
 {
     public string NewHost { get; set; } = string.Empty;
     public int NewHostId { get; set; }
     public string Message { get; set; } = string.Empty;
 }
-
 public class RoomJoinEventData
 {
     public string RoomCode { get; set; } = string.Empty;
     public bool IsHost { get; set; }
     public string Message { get; set; } = string.Empty;
 }
-
 public class RoomPlayerInfo
 {
     public string Username { get; set; } = string.Empty;

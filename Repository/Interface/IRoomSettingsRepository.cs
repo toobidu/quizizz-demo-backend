@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Model.Entity;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Repository.Interface;
-
 public interface IRoomSettingsRepository
 {
     Task<IEnumerable<RoomSetting>> GetSettingsByRoomIdAsync(int roomId);

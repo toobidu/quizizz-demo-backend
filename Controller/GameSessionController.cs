@@ -1,17 +1,13 @@
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Service.Interface;
-
 namespace ConsoleApp1.Controller;
-
 public class GameSessionController
 {
     private readonly IGameSessionService _gameSessionService;
-
     public GameSessionController(IGameSessionService gameSessionService)
     {
         _gameSessionService = gameSessionService;
     }
-
     public async Task<ApiResponse<object>> GetByIdAsync(int id)
     {
         try
@@ -19,17 +15,14 @@ public class GameSessionController
             var gameSession = await _gameSessionService.GetByIdAsync(id);
             if (gameSession == null)
                 return ApiResponse<object>.Fail("Game session not found", 404, "NOT_FOUND", "/api/game-sessions");
-
             return ApiResponse<object>.Success(gameSession, "Game session retrieved successfully", 200,
                 "/api/game-sessions");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error getting game session: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR", "/api/game-sessions");
         }
     }
-
     public async Task<ApiResponse<object>> GetByRoomIdAsync(int roomId)
     {
         try
@@ -38,18 +31,15 @@ public class GameSessionController
             if (gameSession == null)
                 return ApiResponse<object>.Fail("Game session not found for this room", 404, "NOT_FOUND",
                     "/api/game-sessions/by-room");
-
             return ApiResponse<object>.Success(gameSession, "Game session retrieved successfully", 200,
                 "/api/game-sessions/by-room");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error getting game session by room: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR",
                 "/api/game-sessions/by-room");
         }
     }
-
     public async Task<ApiResponse<object>> CreateAsync(GameSession gameSession)
     {
         try
@@ -60,11 +50,9 @@ public class GameSessionController
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error creating game session: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR", "/api/game-sessions");
         }
     }
-
     public async Task<ApiResponse<object>> UpdateAsync(GameSession gameSession)
     {
         try
@@ -72,17 +60,14 @@ public class GameSessionController
             var success = await _gameSessionService.UpdateAsync(gameSession);
             if (!success)
                 return ApiResponse<object>.Fail("Game session not found", 404, "NOT_FOUND", "/api/game-sessions");
-
             return ApiResponse<object>.Success(new { Success = true }, "Game session updated successfully", 200,
                 "/api/game-sessions");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error updating game session: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR", "/api/game-sessions");
         }
     }
-
     public async Task<ApiResponse<object>> DeleteAsync(int id)
     {
         try
@@ -90,17 +75,14 @@ public class GameSessionController
             var success = await _gameSessionService.DeleteAsync(id);
             if (!success)
                 return ApiResponse<object>.Fail("Game session not found", 404, "NOT_FOUND", "/api/game-sessions");
-
             return ApiResponse<object>.Success(new { Success = true }, "Game session deleted successfully", 200,
                 "/api/game-sessions");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error deleting game session: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR", "/api/game-sessions");
         }
     }
-
     public async Task<ApiResponse<object>> UpdateGameStateAsync(int id, string gameState)
     {
         try
@@ -108,18 +90,15 @@ public class GameSessionController
             var success = await _gameSessionService.UpdateGameStateAsync(id, gameState);
             if (!success)
                 return ApiResponse<object>.Fail("Game session not found", 404, "NOT_FOUND", "/api/game-sessions/state");
-
             return ApiResponse<object>.Success(new { Success = true }, "Game state updated successfully", 200,
                 "/api/game-sessions/state");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error updating game state: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR",
                 "/api/game-sessions/state");
         }
     }
-
     public async Task<ApiResponse<object>> UpdateCurrentQuestionIndexAsync(int id, int questionIndex)
     {
         try
@@ -128,18 +107,15 @@ public class GameSessionController
             if (!success)
                 return ApiResponse<object>.Fail("Game session not found", 404, "NOT_FOUND",
                     "/api/game-sessions/question-index");
-
             return ApiResponse<object>.Success(new { Success = true }, "Question index updated successfully", 200,
                 "/api/game-sessions/question-index");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error updating question index: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR",
                 "/api/game-sessions/question-index");
         }
     }
-
     public async Task<ApiResponse<object>> EndGameSessionAsync(int id)
     {
         try
@@ -147,18 +123,15 @@ public class GameSessionController
             var success = await _gameSessionService.EndGameSessionAsync(id);
             if (!success)
                 return ApiResponse<object>.Fail("Game session not found", 404, "NOT_FOUND", "/api/game-sessions/end");
-
             return ApiResponse<object>.Success(new { Success = true }, "Game session ended successfully", 200,
                 "/api/game-sessions/end");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error ending game session: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR",
                 "/api/game-sessions/end");
         }
     }
-
     public async Task<ApiResponse<object>> GetGameQuestionsAsync(int gameSessionId)
     {
         try
@@ -169,12 +142,10 @@ public class GameSessionController
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error getting game questions: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR",
                 "/api/game-sessions/questions");
         }
     }
-
     public async Task<ApiResponse<object>> AddQuestionsToGameSessionAsync(int gameSessionId, List<int> questionIds,
         int timeLimit)
     {
@@ -185,13 +156,11 @@ public class GameSessionController
             if (!success)
                 return ApiResponse<object>.Fail("Failed to add questions to game session", 400, "BAD_REQUEST",
                     "/api/game-sessions/questions");
-
             return ApiResponse<object>.Success(new { Success = true }, "Questions added to game session successfully",
                 200, "/api/game-sessions/questions");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GAME_SESSION_CONTROLLER] Error adding questions to game session: {ex.Message}");
             return ApiResponse<object>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR",
                 "/api/game-sessions/questions");
         }

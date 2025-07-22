@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.Entity.Questions;
-
+namespace ConsoleApp1.Model.Entity.Questions;
 public class Answer
 {
     public int Id { get; set; }
@@ -8,9 +7,7 @@ public class Answer
     public bool IsCorrect { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-
     public Answer() { }
-
     public Answer(int id, int questionId, string answerText, bool isCorrect, 
                  DateTime createdAt, DateTime updatedAt)
     {

@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.DTO.Users;
-
 namespace ConsoleApp1.Service.Interface;
-
 public interface IUserProfileService
 {
     Task<UserProfileDTO?> GetUserProfileAsync(int userId);

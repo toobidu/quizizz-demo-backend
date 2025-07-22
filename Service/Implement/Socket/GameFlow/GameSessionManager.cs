@@ -1,15 +1,12 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
-
 namespace ConsoleApp1.Service.Implement.Socket.GameFlow;
-
 /// <summary>
 /// Service quản lý các phiên game
 /// </summary>
 public class GameSessionManager
 {
     private readonly ConcurrentDictionary<string, GameSession> _gameSessions = new();
-
     /// <summary>
     /// Tạo phiên game mới với câu hỏi
     /// </summary>
@@ -23,11 +20,9 @@ public class GameSessionManager
             GameStartTime = DateTime.UtcNow,
             IsGameActive = true
         };
-
         _gameSessions[roomCode] = gameSession;
         return gameSession;
     }
-
     /// <summary>
     /// Tạo phiên game đơn giản (không có câu hỏi)
     /// </summary>
@@ -39,11 +34,9 @@ public class GameSessionManager
             GameStartTime = DateTime.UtcNow,
             IsGameActive = true
         };
-
         _gameSessions[roomCode] = gameSession;
         return gameSession;
     }
-
     /// <summary>
     /// Lấy phiên game theo mã phòng
     /// </summary>
@@ -52,7 +45,6 @@ public class GameSessionManager
         _gameSessions.TryGetValue(roomCode, out var session);
         return session;
     }
-
     /// <summary>
     /// Kiểm tra phiên game có đang hoạt động không
     /// </summary>
@@ -60,7 +52,6 @@ public class GameSessionManager
     {
         return _gameSessions.TryGetValue(roomCode, out var session) && session.IsGameActive;
     }
-
     /// <summary>
     /// Khởi tạo tiến độ cho tất cả người chơi
     /// </summary>
@@ -68,7 +59,6 @@ public class GameSessionManager
     {
         if (!_gameSessions.TryGetValue(roomCode, out var gameSession))
             return;
-
         foreach (var player in players)
         {
             gameSession.PlayerProgress[player.Username] = new PlayerGameProgress
@@ -77,7 +67,6 @@ public class GameSessionManager
             };
         }
     }
-
     /// <summary>
     /// Cập nhật tiến độ người chơi
     /// </summary>
@@ -85,13 +74,11 @@ public class GameSessionManager
     {
         if (!_gameSessions.TryGetValue(roomCode, out var gameSession))
             return;
-
         if (gameSession.PlayerProgress.TryGetValue(username, out var progress))
         {
             updateAction(progress);
         }
     }
-
     /// <summary>
     /// Kết thúc phiên game
     /// </summary>
@@ -103,7 +90,6 @@ public class GameSessionManager
             gameSession.IsGameEnded = true;
         }
     }
-
     /// <summary>
     /// Dọn dẹp phiên game
     /// </summary>
@@ -114,11 +100,8 @@ public class GameSessionManager
             // Dừng tất cả timer
             gameSession.GameTimer?.Dispose();
             gameSession.CountdownTimer?.Dispose();
-            
-            Console.WriteLine($"[PHIENGAME] Phiên game đã được dọn dẹp cho phòng {roomCode}");
         }
     }
-
     /// <summary>
     /// Lấy tất cả phiên game đang hoạt động
     /// </summary>
@@ -126,7 +109,6 @@ public class GameSessionManager
     {
         return _gameSessions.Values.Where(s => s.IsGameActive).ToList();
     }
-
     /// <summary>
     /// Lấy thống kê phiên game
     /// </summary>
@@ -135,7 +117,6 @@ public class GameSessionManager
         var tongPhienGame = _gameSessions.Count;
         var phienGameDangHoatDong = _gameSessions.Values.Count(s => s.IsGameActive);
         var phienGameDaKetThuc = _gameSessions.Values.Count(s => s.IsGameEnded);
-
         return new
         {
             tongPhienGame,

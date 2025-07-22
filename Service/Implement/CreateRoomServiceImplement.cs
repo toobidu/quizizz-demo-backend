@@ -1,13 +1,11 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Mapper.Rooms;
 using ConsoleApp1.Mapper;
-
 namespace ConsoleApp1.Service.Implement;
-
 public class CreateRoomServiceImplement : ICreateRoomService
 {
     private readonly IRoomRepository _roomRepository;
@@ -18,7 +16,6 @@ public class CreateRoomServiceImplement : ICreateRoomService
     private readonly IRoleRepository _roleRepository;
     private readonly IBroadcastService _broadcastService;
     private readonly ISocketService _socketService;
-
     public CreateRoomServiceImplement(
         IRoomRepository roomRepository,
         IRoomSettingsRepository roomSettingsRepository,
@@ -38,21 +35,15 @@ public class CreateRoomServiceImplement : ICreateRoomService
         _broadcastService = broadcastService;
         _socketService = socketService;
     }
-
     public async Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request, int userId)
     {
-        Console.WriteLine($"[CREATE_ROOM_SERVICE] Creating room for userId: {userId}");
-        
-        // Kiểm tra user đã ở trong phòng nào chưa
+        // Ki?m tra user d� ? trong ph�ng n�o chua
         var existingRoom = await _roomPlayerRepository.GetActiveRoomByUserIdAsync(userId);
         if (existingRoom != null)
         {
-            Console.WriteLine($"[CREATE_ROOM_SERVICE] User {userId} is still in room {existingRoom.RoomCode}, removing them first");
             await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(userId, existingRoom.Id);
         }
-        
         var roomCode = await GenerateUniqueRoomCodeAsync();
-        
         var room = new Room
         {
             RoomCode = roomCode,
@@ -64,19 +55,15 @@ public class CreateRoomServiceImplement : ICreateRoomService
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-        
         var roomId = await _roomRepository.AddAsync(room);
         room.Id = roomId;
-
         await SetupRoomSettingsAsync(roomId, request);
         await UpdateUserTypeAccountAsync(room.OwnerId);
-        
-        // Kiểm tra xem owner đã ở trong phòng chưa (tránh duplicate)
+        // Ki?m tra xem owner d� ? trong ph�ng chua (tr�nh duplicate)
         var existingPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
         if (existingPlayer == null)
         {
-            Console.WriteLine($"[CREATE_ROOM_SERVICE] Adding owner {userId} to room {roomId} as player");
-            // Tự động thêm owner vào phòng như một player
+            // T? d?ng th�m owner v�o ph�ng nhu m?t player
             var roomPlayer = new RoomPlayer
             {
                 RoomId = roomId,
@@ -87,59 +74,33 @@ public class CreateRoomServiceImplement : ICreateRoomService
                 UpdatedAt = DateTime.UtcNow
             };
             var addResult = await _roomPlayerRepository.AddAsync(roomPlayer);
-            Console.WriteLine($"[CREATE_ROOM_SERVICE] Owner {userId} add result: {addResult} (1=success, 0=failed/duplicate)");
-            
-            // Xác nhận lại bằng cách query
+            // X�c nh?n l?i b?ng c�ch query
             var confirmPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
             if (confirmPlayer != null)
             {
-                Console.WriteLine($"[CREATE_ROOM_SERVICE] CONFIRMED: Owner {userId} exists in room {roomId}");
             }
             else
             {
-                Console.WriteLine($"[CREATE_ROOM_SERVICE] ERROR: Owner {userId} NOT found in room {roomId} after insert!");
             }
         }
         else
         {
-            Console.WriteLine($"[CREATE_ROOM_SERVICE] Owner {userId} already exists in room {roomId}, skipping add");
         }
-        
-        // Kiểm tra số lượng player trong phòng sau khi tạo
+        // Ki?m tra s? lu?ng player trong ph�ng sau khi t?o
         var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        Console.WriteLine($"[{timestamp}] 🏠 ROOM CREATED - Room {roomCode} (ID: {roomId}): {playerCount} players | Status: waiting | Owner/Host: {userId}");
-        Console.WriteLine($"[{timestamp}] 📊 WAITING ROOM STATUS - Room {roomCode}: {playerCount}/{request.MaxPlayers} players | Host: {userId}");
-        Console.WriteLine($"[{timestamp}] 👑 HOST ASSIGNED - Room {roomCode}: User {userId} is the room owner and host");
-        
-        // Debug: Kiểm tra trực tiếp database sau khi tạo phòng
-        try
-        {
-            var connectionString = "Host=localhost;Database=quizizz;Username=postgres;Password=123456";
-            await DebugHelper.CheckRoomPlayersInDatabase(connectionString, roomId);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[CREATE_ROOM_SERVICE] Debug error: {ex.Message}");
-        }
-
         var roomDto = RoomMapper.ToDTO(room);
-        
-        // Broadcast room created và cập nhật danh sách người chơi
+        // Broadcast room created v� c?p nh?t danh s�ch ngu?i choi
         try
         {
             await _broadcastService.BroadcastRoomCreatedAsync(roomDto);
             await _broadcastService.BroadcastRoomPlayersUpdateAsync(roomCode);
-            Console.WriteLine($"[{timestamp}] 📡 BROADCAST - Room {roomCode}: Creation and players broadcasted");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{timestamp}] ⚠️ BROADCAST ERROR - Room {roomCode}: {ex.Message}");
         }
-        
         return roomDto;
     }
-
     public async Task<bool> UpdateRoomSettingsAsync(int roomId, RoomSetting settings)
     {
         var existingSetting = await _roomSettingsRepository.GetSettingAsync(roomId, settings.SettingKey);
@@ -155,60 +116,49 @@ public class CreateRoomServiceImplement : ICreateRoomService
         }
         return true;
     }
-
     public async Task<bool> KickPlayerAsync(int roomId, int playerId)
     {
         return await _roomPlayerRepository.DeleteByUserIdAndRoomIdAsync(playerId, roomId);
     }
-
     public async Task<bool> UpdateRoomStatusAsync(int roomId, string status)
     {
         await _roomRepository.UpdateStatusAsync(roomId, status);
         return true;
     }
-
     public async Task<bool> SetTopicForRoomAsync(int roomId, int topicId)
     {
         var setting = new RoomSetting(roomId, "topic_id", topicId.ToString());
         return await UpdateRoomSettingsAsync(roomId, setting);
     }
-
     public async Task<bool> SetQuestionCountAsync(int roomId, int count)
     {
         var setting = new RoomSetting(roomId, "question_count", count.ToString());
         return await UpdateRoomSettingsAsync(roomId, setting);
     }
-
     public async Task<bool> DeleteRoomAsync(int roomId)
     {
         await _roomSettingsRepository.DeleteAllSettingsAsync(roomId);
         return await _roomRepository.DeleteAsync(roomId);
     }
-
     public async Task<bool> SetCountdownTimeAsync(int roomId, int seconds)
     {
         var setting = new RoomSetting(roomId, "countdown_seconds", seconds.ToString());
         return await UpdateRoomSettingsAsync(roomId, setting);
     }
-
     public async Task<bool> UpdateRoomPrivacyAsync(int roomId, bool isPrivate)
     {
         var room = await _roomRepository.GetByIdAsync(roomId);
         if (room == null) return false;
-
         room.IsPrivate = isPrivate;
         room.UpdatedAt = DateTime.UtcNow;
         await _roomRepository.UpdateAsync(room);
         return true;
     }
-
     public async Task<bool> SetGameModeAsync(int roomId, string gameMode)
     {
         if (gameMode != "1vs1" && gameMode != "battle") return false;
-        
         var room = await _roomRepository.GetByIdAsync(roomId);
         if (room == null) return false;
-
         if (gameMode == "1vs1" && room.MaxPlayers != 2)
         {
             room.MaxPlayers = 2;
@@ -219,36 +169,28 @@ public class CreateRoomServiceImplement : ICreateRoomService
             room.MaxPlayers = 10;
             await _roomRepository.UpdateAsync(room);
         }
-
         var setting = new RoomSetting(roomId, "game_mode", gameMode);
         return await UpdateRoomSettingsAsync(roomId, setting);
     }
-
     public async Task<bool> UpdateMaxPlayersAsync(int roomId, int maxPlayers)
     {
         var gameModeSetting = await _roomSettingsRepository.GetSettingAsync(roomId, "game_mode");
         var gameMode = gameModeSetting?.SettingValue ?? "battle";
-        
         if (gameMode == "1vs1" && maxPlayers != 2) return false;
         if (gameMode == "battle" && maxPlayers < 3) return false;
-
         await _roomRepository.UpdateMaxPlayersAsync(roomId, maxPlayers);
         return true;
     }
-
     public async Task<bool> TransferOwnershipAsync(int roomId, int newOwnerId)
     {
         var room = await _roomRepository.GetByIdAsync(roomId);
         if (room == null) return false;
-
         room.OwnerId = newOwnerId;
         room.UpdatedAt = DateTime.UtcNow;
         await _roomRepository.UpdateAsync(room);
-
         await UpdateUserTypeAccountAsync(newOwnerId);
         return true;
     }
-
     private async Task UpdateUserTypeAccountAsync(int userId)
     {
         var user = await _userRepository.GetByIdAsync(userId);
@@ -257,7 +199,6 @@ public class CreateRoomServiceImplement : ICreateRoomService
             user.TypeAccount = "host";
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
-
             var hostRole = await _roleRepository.GetByRoleNameAsync("host");
             if (hostRole != null)
             {
@@ -267,9 +208,6 @@ public class CreateRoomServiceImplement : ICreateRoomService
             }
         }
     }
-
-
-
     private async Task<string> GenerateUniqueRoomCodeAsync()
     {
         string roomCode;
@@ -277,10 +215,8 @@ public class CreateRoomServiceImplement : ICreateRoomService
         {
             roomCode = GenerateRandomCode();
         } while (await _roomRepository.ExistsByCodeAsync(roomCode));
-        
         return roomCode;
     }
-
     private string GenerateRandomCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -288,7 +224,6 @@ public class CreateRoomServiceImplement : ICreateRoomService
         return new string(Enumerable.Repeat(chars, 6)
             .Select(s => s[random.Next(s.Length)]).ToArray());
     }
-
     private async Task SetupRoomSettingsAsync(int roomId, CreateRoomRequest request)
     {
         var settings = new List<RoomSetting>
@@ -298,14 +233,9 @@ public class CreateRoomServiceImplement : ICreateRoomService
             new(roomId, "question_count", request.QuestionCount?.ToString() ?? "10"),
             new(roomId, "countdown_seconds", request.CountdownSeconds?.ToString() ?? "300")
         };
-
         foreach (var setting in settings)
         {
             await _roomSettingsRepository.AddSettingAsync(setting);
         }
-        
-        Console.WriteLine($"[CREATE_ROOM_SERVICE] Room {roomId} settings: GameMode={request.GameMode}, TopicId={request.TopicId ?? 1}, Questions={request.QuestionCount ?? 10}, Time={request.CountdownSeconds ?? 300}s");
     }
-
-
 }

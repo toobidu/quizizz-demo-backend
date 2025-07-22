@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Model.DTO.Rooms;
-
 public class SocketConnectionDTO
 {
     public int Id { get; set; }

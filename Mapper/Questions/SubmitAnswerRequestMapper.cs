@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.DTO.Questions;
 using ConsoleApp1.Model.Entity.Users;
-
 namespace ConsoleApp1.Mapper.Questions;
-
 public static class SubmitAnswerRequestMapper
 {
     public static UserAnswer ToEntity(SubmitAnswerRequest request, int userId, int roomId)

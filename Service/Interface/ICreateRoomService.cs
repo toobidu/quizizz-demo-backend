@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Service.Interface;
-
 public interface ICreateRoomService
 {
     Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request, int userId);

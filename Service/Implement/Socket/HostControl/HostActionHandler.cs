@@ -1,9 +1,7 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-
 namespace ConsoleApp1.Service.Implement.Socket.HostControl;
-
 /// <summary>
 /// Xử lý các hành động cụ thể của host
 /// Chịu trách nhiệm thực thi các lệnh điều khiển từ host
@@ -14,7 +12,6 @@ public class HostActionHandler
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
     private readonly HostControlManager _hostControlManager;
     private readonly ISocketMessageSender _messageSender;
-
     public HostActionHandler(
         ConcurrentDictionary<string, GameRoom> gameRooms,
         ConcurrentDictionary<string, WebSocket> connections,
@@ -26,7 +23,6 @@ public class HostActionHandler
         _hostControlManager = hostControlManager;
         _messageSender = messageSender;
     }
-
     /// <summary>
     /// Chuyển quyền host cho người khác
     /// </summary>
@@ -35,35 +31,26 @@ public class HostActionHandler
     /// <param name="newHostUsername">Username host mới</param>
     public async Task TransferHostAsync(string roomCode, string currentHostUsername, string newHostUsername)
     {
-        Console.WriteLine($"[HOST_ACTION] Chuyển quyền host từ {currentHostUsername} sang {newHostUsername} trong phòng {roomCode}");
-        
         try
         {
             if (!_gameRooms.TryGetValue(roomCode, out var gameRoom))
             {
-                Console.WriteLine($"[HOST_ACTION] Không tìm thấy phòng {roomCode}");
                 return;
             }
-
             var currentHost = gameRoom.Players.FirstOrDefault(p => p.Username == currentHostUsername && p.IsHost);
             var newHost = gameRoom.Players.FirstOrDefault(p => p.Username == newHostUsername);
-
             if (currentHost == null || newHost == null)
             {
-                Console.WriteLine($"[HOST_ACTION] Host hiện tại hoặc host mới không hợp lệ");
                 await _messageSender.SendToPlayerAsync(roomCode, currentHostUsername, "host-error", new {
                     message = "Không thể chuyển quyền host: người dùng không hợp lệ"
                 });
                 return;
             }
-
             // Thực hiện chuyển quyền host
             currentHost.IsHost = false;
             newHost.IsHost = true;
-
             // Cập nhật host manager
             _hostControlManager.UpdateCurrentHost(roomCode, newHostUsername, currentHostUsername);
-
             // Log hành động
             var hostAction = new HostAction
             {
@@ -75,31 +62,24 @@ public class HostActionHandler
                 }
             };
             _hostControlManager.AddHostAction(roomCode, hostAction);
-
             // Thông báo cho tất cả player
             await _messageSender.BroadcastToRoomAsync(roomCode, "host-changed", new {
                 oldHost = currentHostUsername,
                 newHost = newHostUsername,
                 message = $"{newHostUsername} đã trở thành host mới của phòng"
             });
-
             // Gửi thông báo riêng cho host mới
             var hostNotification = HostControlHelper.CreateHostNotification(
                 "Bạn đã trở thành host của phòng", 
                 gameRoom, 
                 _hostControlManager.GetHostSession(roomCode)
             );
-            
             await _messageSender.SendToPlayerAsync(roomCode, newHostUsername, "you-are-host", hostNotification);
-
-            Console.WriteLine($"[HOST_ACTION] Chuyển quyền host thành công trong phòng {roomCode}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HOST_ACTION] Lỗi khi chuyển quyền host trong phòng {roomCode}: {ex.Message}");
         }
     }
-
     /// <summary>
     /// Kick player khỏi phòng (chỉ host mới có quyền)
     /// </summary>
@@ -108,16 +88,12 @@ public class HostActionHandler
     /// <param name="playerToKick">Username của player cần kick</param>
     public async Task KickPlayerAsync(string roomCode, string hostUsername, string playerToKick)
     {
-        Console.WriteLine($"[HOST_ACTION] {hostUsername} đang kick {playerToKick} khỏi phòng {roomCode}");
-        
         try
         {
             if (!_gameRooms.TryGetValue(roomCode, out var gameRoom))
             {
-                Console.WriteLine($"[HOST_ACTION] Không tìm thấy phòng {roomCode}");
                 return;
             }
-
             // Kiểm tra quyền host
             if (!_hostControlManager.IsUserHost(roomCode, hostUsername))
             {
@@ -126,7 +102,6 @@ public class HostActionHandler
                 });
                 return;
             }
-
             var playerToRemove = gameRoom.Players.FirstOrDefault(p => p.Username == playerToKick);
             if (playerToRemove == null)
             {
@@ -135,7 +110,6 @@ public class HostActionHandler
                 });
                 return;
             }
-
             // Không cho phép kick chính mình
             if (playerToKick == hostUsername)
             {
@@ -144,17 +118,14 @@ public class HostActionHandler
                 });
                 return;
             }
-
             // Thông báo cho player bị kick
             await _messageSender.SendToPlayerAsync(roomCode, playerToKick, "kicked-from-room", new {
                 message = "Bạn đã bị kick khỏi phòng bởi host",
                 hostUsername = hostUsername,
                 reason = "Bị host kick khỏi phòng"
             });
-
             // Xóa player khỏi phòng
             gameRoom.Players.Remove(playerToRemove);
-
             // Log hành động
             var hostAction = new HostAction
             {
@@ -163,7 +134,6 @@ public class HostActionHandler
                 Data = new { kickedPlayer = playerToKick }
             };
             _hostControlManager.AddHostAction(roomCode, hostAction);
-
             // Thông báo cho tất cả player còn lại
             await _messageSender.BroadcastToRoomAsync(roomCode, "player-kicked", new {
                 kickedPlayer = playerToKick,
@@ -171,15 +141,11 @@ public class HostActionHandler
                 message = $"{playerToKick} đã bị kick khỏi phòng",
                 remainingPlayers = gameRoom.Players.Count
             });
-
-            Console.WriteLine($"[HOST_ACTION] Đã kick {playerToKick} khỏi phòng {roomCode} bởi {hostUsername}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HOST_ACTION] Lỗi khi kick player khỏi phòng {roomCode}: {ex.Message}");
         }
     }
-
     /// <summary>
     /// Xử lý yêu cầu câu hỏi tiếp theo từ host
     /// </summary>
@@ -187,16 +153,12 @@ public class HostActionHandler
     /// <param name="hostUsername">Username của host</param>
     public async Task HandleNextQuestionRequestAsync(string roomCode, string hostUsername)
     {
-        Console.WriteLine($"[HOST_ACTION] {hostUsername} yêu cầu câu hỏi tiếp theo cho phòng {roomCode}");
-        
         try
         {
             if (!_gameRooms.TryGetValue(roomCode, out var gameRoom))
             {
-                Console.WriteLine($"[HOST_ACTION] Không tìm thấy phòng {roomCode}");
                 return;
             }
-
             // Kiểm tra quyền host
             if (!_hostControlManager.IsUserHost(roomCode, hostUsername))
             {
@@ -205,7 +167,6 @@ public class HostActionHandler
                 });
                 return;
             }
-
             // Kiểm tra trạng thái game
             if (!HostControlHelper.IsActionValidForGameState("next-question", gameRoom.GameState))
             {
@@ -215,9 +176,7 @@ public class HostActionHandler
                 });
                 return;
             }
-
             var nextQuestionIndex = gameRoom.CurrentQuestionIndex + 1;
-
             // Log hành động
             var hostAction = new HostAction
             {
@@ -229,32 +188,25 @@ public class HostActionHandler
                 }
             };
             _hostControlManager.AddHostAction(roomCode, hostAction);
-
             // Thông báo cho host về việc xử lý request
             await _messageSender.SendToPlayerAsync(roomCode, hostUsername, "host-action-processed", new {
                 action = "next-question-requested",
                 status = "processing",
                 message = "Đang xử lý yêu cầu chuyển câu hỏi tiếp theo..."
             });
-
             // Broadcast thông báo cho tất cả player
             await _messageSender.BroadcastToRoomAsync(roomCode, "host-action", new {
                 action = "next-question-requested",
                 hostUsername = hostUsername,
                 message = $"{hostUsername} đã yêu cầu chuyển câu hỏi tiếp theo"
             });
-
             // Simulate việc gửi câu hỏi tiếp theo (trong thực tế sẽ gọi GameFlowService)
             await SimulateNextQuestionAsync(roomCode, nextQuestionIndex);
-
-            Console.WriteLine($"[HOST_ACTION] Xử lý yêu cầu câu hỏi tiếp theo thành công cho phòng {roomCode}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HOST_ACTION] Lỗi khi xử lý yêu cầu câu hỏi tiếp theo cho phòng {roomCode}: {ex.Message}");
         }
     }
-
     /// <summary>
     /// Simulate việc gửi câu hỏi tiếp theo
     /// Trong thực tế sẽ gọi GameFlowService
@@ -265,17 +217,13 @@ public class HostActionHandler
     {
         // Trong thực tế sẽ gọi:
         // await _gameFlowService.SendQuestionAsync(roomCode, question, questionIndex, totalQuestions);
-        
         await _messageSender.BroadcastToRoomAsync(roomCode, "next-question-ready", new {
             questionIndex = questionIndex,
             message = $"Câu hỏi số {questionIndex + 1} đã sẵn sàng",
             timestamp = DateTime.UtcNow
         });
-        
-        Console.WriteLine($"[HOST_ACTION] Simulate câu hỏi {questionIndex} cho phòng {roomCode}");
     }
 }
-
 /// <summary>
 /// Interface cho việc gửi message qua WebSocket
 /// Để tách biệt logic gửi message khỏi business logic

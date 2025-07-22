@@ -1,8 +1,6 @@
 using ConsoleApp1.Model.DTO.Rooms.Games;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Service.Interface;
-
 public interface IGameSessionService
 {
     Task<GameSessionDTO> GetByIdAsync(int id);

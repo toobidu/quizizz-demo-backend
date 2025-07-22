@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.DTO.Users;
-
+using ConsoleApp1.Model.DTO.Users;
 namespace ConsoleApp1.Service.Interface;
-
 public interface IUserService
 {
     Task<bool> CreateUserAsync(UserDTO user);

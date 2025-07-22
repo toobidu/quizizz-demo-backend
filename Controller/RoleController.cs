@@ -1,15 +1,12 @@
-﻿using ConsoleApp1.Model.DTO.Users;
+using ConsoleApp1.Model.DTO.Users;
 using ConsoleApp1.Security;
 using ConsoleApp1.Service.Interface;
-
 namespace ConsoleApp1.Controller;
-
 public class RoleController
 {
     private readonly IRoleService _roleService;
     private readonly IAuthorizationService _authService;
     private readonly JwtHelper _jwt;
-
     public RoleController(
         IRoleService roleService,
         IAuthorizationService authService,
@@ -19,16 +16,13 @@ public class RoleController
         _authService = authService;
         _jwt = jwt;
     }
-
     private async Task<(bool isAuthorized, int userId)> IsAuthorized(string token)
     {
         int? userId = _jwt.GetUserIdFromToken(token);
         if (userId == null) return (false, -1);
-
         var hasPermission = await _authService.HasPermissionAsync(userId.Value, "ManageRoles");
         return (hasPermission, userId.Value);
     }
-
     /*
     GET /api/roles/{id}
     */
@@ -36,10 +30,8 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return null;
-
         return await _roleService.GetRoleByIdAsync(id);
     }
-
     /*
     GET /api/roles
     */
@@ -47,10 +39,8 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return new List<RoleDTO>();
-
         return await _roleService.GetAllRolesAsync();
     }
-
     /*
     POST /api/roles
     */
@@ -58,10 +48,8 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return null;
-
         return await _roleService.CreateRoleAsync(role);
     }
-
     /*
     PUT /api/roles
     */
@@ -69,22 +57,18 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return null;
-
         return await _roleService.UpdateRoleAsync(role);
     }
-
     /*
     DELETE /api/roles/{id}
     */
     public async Task<string> DeleteRoleAsync(int id, string accessToken)
     {
         var (authorized, _) = await IsAuthorized(accessToken);
-        if (!authorized) return "Bạn không có quyền thực hiện hành động này.";
-
+        if (!authorized) return "B?n kh�ng c� quy?n th?c hi?n h�nh d?ng n�y.";
         await _roleService.DeleteRoleAsync(id);
-        return "Xóa role thành công";
+        return "X�a role th�nh c�ng";
     }
-
     /*
     GET /api/roles/user/{userId}
     */
@@ -92,10 +76,8 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return new List<RoleDTO>();
-
         return await _roleService.GetRolesByUserIdAsync(userId);
     }
-
     /*
     GET /api/roles/exists?name={roleName}
     */
@@ -103,10 +85,8 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return false;
-
         return await _roleService.RoleNameExistsAsync(roleName);
     }
-
     /*
     GET /api/roles/by-permission/{permissionId}
     */
@@ -114,10 +94,8 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return new List<RoleDTO>();
-
         return await _roleService.GetRolesByPermissionIdAsync(permissionId);
     }
-
     /*
     POST /api/roles/by-user-permissions
     */
@@ -128,7 +106,6 @@ public class RoleController
     {
         var (authorized, _) = await IsAuthorized(accessToken);
         if (!authorized) return new List<RoleDTO>();
-
         return await _roleService.GetRolesByUserIdAndPermissionNamesAsync(userId, permissionNames);
     }
 }

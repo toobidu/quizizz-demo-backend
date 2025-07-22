@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.DTO.Questions;
 using ConsoleApp1.Model.Entity.Questions;
-
 namespace ConsoleApp1.Mapper.Questions;
-
 public static class QuestionMapper
 {
     public static QuestionDTO ToDTO(Question question, List<AnswerDTO> options)
@@ -17,7 +15,6 @@ public static class QuestionMapper
             points: 100 // Default points
         );
     }
-
     public static Question ToEntity(QuestionDTO questionDto)
     {
         return new Question(

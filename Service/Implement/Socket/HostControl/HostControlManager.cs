@@ -1,8 +1,6 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
-
 namespace ConsoleApp1.Service.Implement.Socket.HostControl;
-
 /// <summary>
 /// Quản lý các session điều khiển host và thông tin phòng
 /// Chịu trách nhiệm lưu trữ và quản lý trạng thái host control
@@ -11,15 +9,12 @@ public class HostControlManager
 {
     // Dictionary lưu trữ host control sessions theo room code
     private readonly ConcurrentDictionary<string, HostControlSession> _hostSessions = new();
-    
     // Dictionary lưu trữ các phòng game (shared reference)
     private readonly ConcurrentDictionary<string, GameRoom> _gameRooms;
-
     public HostControlManager(ConcurrentDictionary<string, GameRoom> gameRooms)
     {
         _gameRooms = gameRooms;
     }
-
     /// <summary>
     /// Lấy hoặc tạo mới host session cho phòng
     /// </summary>
@@ -36,13 +31,9 @@ public class HostControlManager
                 CurrentHostUsername = hostUsername
             };
             _hostSessions[roomCode] = hostSession;
-            
-            Console.WriteLine($"[HOST_MANAGER] Tạo host session mới cho phòng {roomCode} với host {hostUsername}");
         }
-        
         return hostSession;
     }
-
     /// <summary>
     /// Cập nhật host hiện tại của phòng
     /// </summary>
@@ -52,7 +43,6 @@ public class HostControlManager
     public void UpdateCurrentHost(string roomCode, string newHostUsername, string? oldHostUsername = null)
     {
         var hostSession = GetOrCreateHostSession(roomCode, newHostUsername);
-        
         // Thêm host cũ vào lịch sử nếu có
         if (!string.IsNullOrEmpty(oldHostUsername) && oldHostUsername != newHostUsername)
         {
@@ -61,13 +51,9 @@ public class HostControlManager
                 hostSession.HostHistory.Add(oldHostUsername);
             }
         }
-        
         hostSession.CurrentHostUsername = newHostUsername;
         hostSession.UpdateHostActivity(newHostUsername);
-        
-        Console.WriteLine($"[HOST_MANAGER] Cập nhật host cho phòng {roomCode}: {oldHostUsername} -> {newHostUsername}");
     }
-
     /// <summary>
     /// Thêm hành động của host vào lịch sử
     /// </summary>
@@ -78,10 +64,8 @@ public class HostControlManager
         if (_hostSessions.TryGetValue(roomCode, out var hostSession))
         {
             hostSession.AddAction(action);
-            Console.WriteLine($"[HOST_MANAGER] Thêm hành động {action.Action} của host {action.HostUsername} trong phòng {roomCode}");
         }
     }
-
     /// <summary>
     /// Lấy host session của phòng
     /// </summary>
@@ -92,7 +76,6 @@ public class HostControlManager
         _hostSessions.TryGetValue(roomCode, out var hostSession);
         return hostSession;
     }
-
     /// <summary>
     /// Xóa host session khi phòng bị đóng
     /// </summary>
@@ -101,10 +84,8 @@ public class HostControlManager
     {
         if (_hostSessions.TryRemove(roomCode, out var removedSession))
         {
-            Console.WriteLine($"[HOST_MANAGER] Xóa host session cho phòng {roomCode}");
         }
     }
-
     /// <summary>
     /// Kiểm tra xem user có phải là host của phòng không
     /// </summary>
@@ -117,11 +98,9 @@ public class HostControlManager
         {
             return false;
         }
-
         var host = gameRoom.Players.FirstOrDefault(p => p.IsHost);
         return host?.Username == username;
     }
-
     /// <summary>
     /// Lấy thông tin host hiện tại của phòng
     /// </summary>
@@ -133,7 +112,6 @@ public class HostControlManager
         {
             return null;
         }
-
         return gameRoom.Players.FirstOrDefault(p => p.IsHost);
     }
 }

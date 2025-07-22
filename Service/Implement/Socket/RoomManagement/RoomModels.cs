@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Implement.Socket.RoomManagement;
-
 /// <summary>
 /// Models cho Room Management Service
 /// </summary>
@@ -11,7 +10,6 @@ public class RoomPlayerInfo
     public DateTime? JoinTime { get; set; }
     public bool IsOnline { get; set; }
 }
-
 /// <summary>
 /// Room update event data
 /// </summary>
@@ -22,7 +20,6 @@ public class RoomUpdateEventData
     public int TotalPlayers { get; set; }
     public string? Host { get; set; }
 }
-
 /// <summary>
 /// Host change event data
 /// </summary>
@@ -32,7 +29,6 @@ public class HostChangeEventData
     public int NewHostId { get; set; }
     public string Message { get; set; } = string.Empty;
 }
-
 /// <summary>
 /// Room join event data
 /// </summary>

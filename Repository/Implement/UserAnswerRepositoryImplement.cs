@@ -1,22 +1,17 @@
-﻿using System.Data;
+using System.Data;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
 using Npgsql;
-
 namespace ConsoleApp1.Repository.Implement;
-
 public class UserAnswerRepositoryImplement : IUserAnswerRepository
 {
     public readonly string ConnectionString;
-
     public UserAnswerRepositoryImplement(string connectionString)
     {
         ConnectionString = connectionString;
     }
-
     private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
-
     public async Task<UserAnswer?> GetByUserIdRoomIdQuestionIdAsync(int userId, int roomId, int questionId)
     {
         const string query = @"
@@ -25,7 +20,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         using var conn = CreateConnection();
         return await conn.QuerySingleOrDefaultAsync<UserAnswer>(query, new { UserId = userId, RoomId = roomId, QuestionId = questionId });
     }
-
     public async Task<IEnumerable<UserAnswer>> GetByUserIdAsync(int userId)
     {
         const string query = @"SELECT * FROM user_answers WHERE user_id = @UserId";
@@ -33,7 +27,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         var result = await conn.QueryAsync<UserAnswer>(query, new { UserId = userId });
         return result.ToList();
     }
-
     public async Task<IEnumerable<UserAnswer>> GetByRoomIdAsync(int roomId)
     {
         const string query = @"SELECT * FROM user_answers WHERE room_id = @RoomId";
@@ -41,7 +34,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         var result = await conn.QueryAsync<UserAnswer>(query, new { RoomId = roomId });
         return result.ToList();
     }
-
     public async Task<IEnumerable<UserAnswer>> GetByQuestionIdAsync(int questionId)
     {
         const string query = @"SELECT * FROM user_answers WHERE question_id = @QuestionId";
@@ -49,7 +41,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         var result = await conn.QueryAsync<UserAnswer>(query, new { QuestionId = questionId });
         return result.ToList();
     }
-
     public async Task<IEnumerable<UserAnswer>> GetRecentAnswersByUserIdAsync(int userId, int gameLimit)
     {
         const string query = @"
@@ -69,7 +60,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
             splitOn: "topic_id");
         return result.ToList();
     }
-
     public async Task<int> AddAsync(UserAnswer answer)
     {
         const string query = @"
@@ -79,7 +69,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, answer);
     }
-
     public async Task UpdateAsync(UserAnswer answer)
     {
         const string query = @"
@@ -90,7 +79,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         using var conn = CreateConnection();
         await conn.ExecuteAsync(query, answer);
     }
-
     public async Task<bool> DeleteByUserIdRoomIdQuestionIdAsync(int userId, int roomId, int questionId)
     {
         const string query = @"
@@ -100,7 +88,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         var affected = await conn.ExecuteAsync(query, new { UserId = userId, RoomId = roomId, QuestionId = questionId });
         return affected > 0;
     }
-    
     public async Task<IEnumerable<UserAnswer>> GetByRoomIdAndQuestionIdAsync(int roomId, int questionId)
     {
         const string query = @"SELECT * FROM user_answers 
@@ -109,7 +96,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         return await conn.QueryAsync<UserAnswer>(query, 
             new { RoomId = roomId, QuestionId = questionId });
     }
-
     public async Task<Dictionary<int, int>> GetAnswerDistributionAsync(int questionId)
     {
         const string query = @"
@@ -122,7 +108,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
             new { QuestionId = questionId });
         return results.ToDictionary(x => x.AnswerId, x => x.Count);
     }
-
     public async Task<double> GetAverageResponseTimeAsync(int questionId)
     {
         const string query = @"
@@ -132,7 +117,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<double>(query, new { QuestionId = questionId });
     }
-    
     public async Task<IEnumerable<(int QuestionId, double AverageTime)>> GetAverageTimesByRoomAsync(int roomId)
     {
         const string query = @"
@@ -144,7 +128,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         using var conn = CreateConnection();
         return await conn.QueryAsync<(int QuestionId, double AverageTime)>(query, new { RoomId = roomId });
     }
-    
     public async Task<IEnumerable<UserAnswer>> GetByGameSessionIdAsync(int gameSessionId)
     {
         const string query = @"SELECT * FROM user_answers WHERE game_session_id = @GameSessionId";
@@ -152,7 +135,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         var result = await conn.QueryAsync<UserAnswer>(query, new { GameSessionId = gameSessionId });
         return result.ToList();
     }
-    
     public async Task<IEnumerable<UserAnswer>> GetByGameSessionIdAndQuestionIdAsync(int gameSessionId, int questionId)
     {
         const string query = @"SELECT * FROM user_answers 
@@ -161,7 +143,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         return await conn.QueryAsync<UserAnswer>(query, 
             new { GameSessionId = gameSessionId, QuestionId = questionId });
     }
-    
     public async Task UpdateScoreAsync(int userId, int roomId, int questionId, int score)
     {
         const string query = @"
@@ -172,7 +153,6 @@ public class UserAnswerRepositoryImplement : IUserAnswerRepository
         await conn.ExecuteAsync(query, 
             new { UserId = userId, RoomId = roomId, QuestionId = questionId, Score = score });
     }
-    
     public async Task UpdateGameSessionIdAsync(int userId, int roomId, int questionId, int gameSessionId)
     {
         const string query = @"

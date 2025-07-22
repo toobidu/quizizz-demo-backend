@@ -3,9 +3,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-
 namespace ConsoleApp1.Service.Implement.Socket.HostControl;
-
 /// <summary>
 /// Implementation của ISocketMessageSender
 /// Chịu trách nhiệm gửi message qua WebSocket
@@ -14,7 +12,6 @@ public class SocketMessageSender : ISocketMessageSender
 {
     private readonly ConcurrentDictionary<string, GameRoom> _gameRooms;
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
-
     public SocketMessageSender(
         ConcurrentDictionary<string, GameRoom> gameRooms,
         ConcurrentDictionary<string, WebSocket> connections)
@@ -22,7 +19,6 @@ public class SocketMessageSender : ISocketMessageSender
         _gameRooms = gameRooms;
         _connections = connections;
     }
-
     /// <summary>
     /// Gửi message đến tất cả client trong phòng
     /// </summary>
@@ -33,19 +29,14 @@ public class SocketMessageSender : ISocketMessageSender
     {
         if (!_gameRooms.TryGetValue(roomCode, out var gameRoom)) 
         {
-            Console.WriteLine($"[MESSAGE_SENDER] Không tìm thấy phòng {roomCode} để broadcast");
             return;
         }
-        
         var message = JsonSerializer.Serialize(new {
             eventName = eventName,
             data = data,
             timestamp = DateTime.UtcNow
         });
         var buffer = Encoding.UTF8.GetBytes(message);
-        
-        Console.WriteLine($"[MESSAGE_SENDER] Broadcasting '{eventName}' đến {gameRoom.Players.Count} players trong phòng {roomCode}");
-        
         var sendTasks = gameRoom.Players
             .Where(p => !string.IsNullOrEmpty(p.SocketId))
             .Select(async player =>
@@ -56,22 +47,17 @@ public class SocketMessageSender : ISocketMessageSender
                     try
                     {
                         await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                        Console.WriteLine($"[MESSAGE_SENDER] Đã gửi '{eventName}' đến {player.Username}");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[MESSAGE_SENDER] Lỗi gửi message đến {player.Username}: {ex.Message}");
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"[MESSAGE_SENDER] Socket của {player.Username} không khả dụng");
                 }
             });
-        
         await Task.WhenAll(sendTasks);
     }
-
     /// <summary>
     /// Gửi message đến một player cụ thể
     /// </summary>
@@ -83,17 +69,13 @@ public class SocketMessageSender : ISocketMessageSender
     {
         if (!_gameRooms.TryGetValue(roomCode, out var gameRoom)) 
         {
-            Console.WriteLine($"[MESSAGE_SENDER] Không tìm thấy phòng {roomCode} để gửi message đến {username}");
             return;
         }
-        
         var player = gameRoom.Players.FirstOrDefault(p => p.Username == username);
         if (player?.SocketId == null) 
         {
-            Console.WriteLine($"[MESSAGE_SENDER] Không tìm thấy player {username} hoặc socket ID trong phòng {roomCode}");
             return;
         }
-        
         if (_connections.TryGetValue(player.SocketId, out var socket) && socket.State == WebSocketState.Open)
         {
             try
@@ -105,20 +87,15 @@ public class SocketMessageSender : ISocketMessageSender
                 });
                 var buffer = Encoding.UTF8.GetBytes(message);
                 await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                
-                Console.WriteLine($"[MESSAGE_SENDER] Đã gửi '{eventName}' đến {username} trong phòng {roomCode}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MESSAGE_SENDER] Lỗi gửi message đến {username}: {ex.Message}");
             }
         }
         else
         {
-            Console.WriteLine($"[MESSAGE_SENDER] Socket của {username} không khả dụng");
         }
     }
-
     /// <summary>
     /// Gửi message đến nhiều players cụ thể
     /// </summary>
@@ -130,10 +107,8 @@ public class SocketMessageSender : ISocketMessageSender
     {
         var sendTasks = usernames.Select(username => 
             SendToPlayerAsync(roomCode, username, eventName, data));
-        
         await Task.WhenAll(sendTasks);
     }
-
     /// <summary>
     /// Gửi message đến tất cả players trừ một số players cụ thể
     /// </summary>
@@ -144,12 +119,10 @@ public class SocketMessageSender : ISocketMessageSender
     public async Task BroadcastToRoomExceptAsync(string roomCode, IEnumerable<string> excludeUsernames, string eventName, object data)
     {
         if (!_gameRooms.TryGetValue(roomCode, out var gameRoom)) return;
-        
         var excludeSet = excludeUsernames.ToHashSet();
         var targetPlayers = gameRoom.Players
             .Where(p => !excludeSet.Contains(p.Username))
             .Select(p => p.Username);
-        
         await SendToPlayersAsync(roomCode, targetPlayers, eventName, data);
     }
 }

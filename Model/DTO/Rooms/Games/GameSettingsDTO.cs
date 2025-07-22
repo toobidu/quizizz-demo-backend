@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO.Rooms.Games;
-
+namespace ConsoleApp1.Model.DTO.Rooms.Games;
 public class GameSettingsDTO
 {
     public int TimePerQuestion { get; set; }
@@ -8,7 +7,6 @@ public class GameSettingsDTO
     public bool ShuffleAnswers { get; set; }
     public int PointsPerQuestion { get; set; }
     public bool EnableTimer { get; set; }
-    
     public GameSettingsDTO(int timePerQuestion, bool showAnswersAfterQuestion, 
         bool shuffleQuestions, bool shuffleAnswers, int pointsPerQuestion, bool enableTimer)
     {

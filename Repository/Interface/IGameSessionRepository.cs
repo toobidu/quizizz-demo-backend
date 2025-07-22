@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Repository.Interface;
-
 public interface IGameSessionRepository
 {
     Task<GameSession> GetByIdAsync(int id);

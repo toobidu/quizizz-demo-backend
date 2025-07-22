@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.Entity.Users;
-
+namespace ConsoleApp1.Model.Entity.Users;
 public class User
 {
     public int Id { get; set; }
@@ -12,9 +11,7 @@ public class User
     public string TypeAccount { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-
     public User() { }
-
     public User(string username, string fullName, string email, string phoneNumber, 
                string address, string password, string typeAccount, DateTime createdAt, DateTime updatedAt)
     {

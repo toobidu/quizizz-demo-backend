@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.Entity.Questions;
-
+using ConsoleApp1.Model.Entity.Questions;
 namespace ConsoleApp1.Repository.Interface;
-
 public interface IRankRepository
 {
     Task<Rank?> GetByIdAsync(int id);

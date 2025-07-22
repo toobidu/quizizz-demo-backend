@@ -1,14 +1,11 @@
 using ConsoleApp1.Model.DTO.Game;
-
 namespace ConsoleApp1.Service.Implement.Socket.Scoring;
-
 /// <summary>
 /// Service tính toán điểm số và xếp hạng
 /// </summary>
 public class ScoreCalculator
 {
     private readonly AchievementCalculator _achievementCalculator;
-
     public ScoreCalculator()
     {
         _achievementCalculator = new AchievementCalculator();
@@ -35,16 +32,13 @@ public class ScoreCalculator
             })
             .ToList();
     }
-
     /// <summary>
     /// Detect thay đổi vị trí trong bảng xếp hạng
     /// </summary>
     public List<object> DetectPositionChanges(List<ScoreboardEntry> oldScoreboard, List<ScoreboardEntry> newScoreboard)
     {
         var changes = new List<object>();
-        
         if (oldScoreboard.Count == 0) return changes;
-
         foreach (var newEntry in newScoreboard)
         {
             var oldEntry = oldScoreboard.FirstOrDefault(o => o.Username == newEntry.Username);
@@ -58,10 +52,8 @@ public class ScoreCalculator
                 });
             }
         }
-
         return changes;
     }
-
     /// <summary>
     /// Tính toán kết quả cuối game chi tiết
     /// </summary>
@@ -82,7 +74,6 @@ public class ScoreCalculator
                 questionScores = player.QuestionScores
             })
             .ToList<object>();
-
         var statistics = new {
             totalPlayers = scoringSession.PlayerScores.Count,
             averageScore = scoringSession.PlayerScores.Values.Average(p => p.TotalScore),
@@ -92,16 +83,13 @@ public class ScoreCalculator
                 p.TotalAnswers > 0 ? (double)p.CorrectAnswers / p.TotalAnswers * 100 : 0),
             averageTime = scoringSession.PlayerScores.Values.Average(p => p.AverageTime)
         };
-
         var achievements = _achievementCalculator.CalculateAchievements(scoringSession);
-        
         // Estimate game start time (có thể cần lưu chính xác hơn)
         var gameStartTime = scoringSession.PlayerScores.Values
             .Select(p => p.LastAnswerTime)
             .DefaultIfEmpty(DateTime.UtcNow)
             .Min()
             .AddMinutes(-ScoringConstants.Thresholds.GameStartTimeEstimateMinutes);
-
         return new DetailedGameResults
         {
             Rankings = rankings,
@@ -110,7 +98,6 @@ public class ScoreCalculator
             GameStartTime = gameStartTime
         };
     }
-
     /// <summary>
     /// Tính phần trăm player tốt hơn bao nhiêu người khác
     /// </summary>
@@ -118,14 +105,10 @@ public class ScoreCalculator
     {
         var totalPlayers = rankings.Count;
         if (totalPlayers <= 1) return 0;
-
         var playerRank = rankings
             .Cast<dynamic>()
             .FirstOrDefault(r => r.username == playerScore.Username)?.rank ?? totalPlayers;
-
         var betterThanCount = totalPlayers - playerRank;
         return (double)betterThanCount / (totalPlayers - 1) * 100;
     }
-
-
 }

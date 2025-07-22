@@ -1,8 +1,6 @@
 using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Service.Interface;
-
 public interface ISocketConnectionService
 {
     Task<SocketConnectionDTO> GetByIdAsync(int id);

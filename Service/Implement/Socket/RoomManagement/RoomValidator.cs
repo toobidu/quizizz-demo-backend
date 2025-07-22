@@ -1,8 +1,6 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
-
 namespace ConsoleApp1.Service.Implement.Socket.RoomManagement;
-
 /// <summary>
 /// Service validation cho Room Management
 /// </summary>
@@ -17,7 +15,6 @@ public class RoomValidator
                roomCode.Length >= 4 && 
                roomCode.Length <= 10;
     }
-
     /// <summary>
     /// Validate username
     /// </summary>
@@ -27,7 +24,6 @@ public class RoomValidator
                username.Length >= 2 && 
                username.Length <= 50;
     }
-
     /// <summary>
     /// Validate user ID
     /// </summary>
@@ -35,7 +31,6 @@ public class RoomValidator
     {
         return userId > 0;
     }
-
     /// <summary>
     /// Kiểm tra xem player đã tồn tại trong room chưa
     /// </summary>
@@ -43,7 +38,6 @@ public class RoomValidator
     {
         return gameRoom.Players.Any(p => p.UserId == userId);
     }
-
     /// <summary>
     /// Kiểm tra xem room có đầy không
     /// </summary>
@@ -51,7 +45,6 @@ public class RoomValidator
     {
         return gameRoom.Players.Count >= maxPlayers;
     }
-
     /// <summary>
     /// Kiểm tra xem room có thể join được không
     /// </summary>
@@ -61,20 +54,16 @@ public class RoomValidator
         {
             return (false, "Phòng đã đầy");
         }
-
         if (gameRoom.GameState == "playing")
         {
             return (false, "Game đang diễn ra, không thể tham gia");
         }
-
         if (IsPlayerExistsInRoom(gameRoom, userId))
         {
             return (true, "Player đã tồn tại, cập nhật connection");
         }
-
         return (true, "Có thể tham gia");
     }
-
     /// <summary>
     /// Validate socket connection
     /// </summary>

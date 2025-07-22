@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO.Rooms.Games;
-
+namespace ConsoleApp1.Model.DTO.Rooms.Games;
 public class PlayerProgressDTO
 {
     public int UserId { get; set; }
@@ -9,7 +8,6 @@ public class PlayerProgressDTO
     public int TotalQuestions { get; set; }
     public double Accuracy { get; set; }
     public TimeSpan AverageResponseTime { get; set; }
-    
     public PlayerProgressDTO(int userId, string username, int currentScore, 
         int correctAnswers, int totalQuestions, double accuracy, TimeSpan averageResponseTime)
     {

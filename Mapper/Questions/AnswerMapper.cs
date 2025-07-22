@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.DTO.Questions;
 using ConsoleApp1.Model.Entity.Questions;
-
 namespace ConsoleApp1.Mapper.Questions;
-
 public static class AnswerMapper
 {
     public static AnswerDTO ToDTO(Answer answer)
@@ -13,7 +11,6 @@ public static class AnswerMapper
             optionIndex: 0
         );
     }
-
     public static Answer ToEntity(AnswerDTO answerDto)
     {
         return new Answer(

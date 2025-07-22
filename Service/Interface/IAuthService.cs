@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.DTO.Authentication;
-
+using ConsoleApp1.Model.DTO.Authentication;
 namespace ConsoleApp1.Service.Interface;
-
 public interface IAuthService
 {
     Task<LoginResponse?> LoginAsync(LoginRequest request);

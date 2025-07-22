@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Mapper.Rooms;
-
 public static class PlayerInRoomMapper
 {
     public static PlayerInRoomDTO ToDTO(RoomPlayer rp, string username)
@@ -14,7 +12,6 @@ public static class PlayerInRoomMapper
             timeTaken: rp.TimeTaken
         );
     }
-
     public static RoomPlayer ToEntity(PlayerInRoomDTO dto)
     {
         return new RoomPlayer(

@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO.Questions;
-
+namespace ConsoleApp1.Model.DTO.Questions;
 public class QuestionDTO
 {
     public int Id { get; set; }
@@ -9,7 +8,6 @@ public class QuestionDTO
     public int QuestionTypeId { get; set; }
     public int TimeLimit { get; set; }
     public int Points { get; set; }
-    
     public QuestionDTO(int id, string questionText, List<AnswerDTO> options, 
         int topicId, int questionTypeId, int timeLimit, int points)
     {

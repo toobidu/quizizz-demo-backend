@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.Entity.Questions;
-
+using ConsoleApp1.Model.Entity.Questions;
 namespace ConsoleApp1.Repository.Interface;
-
 public interface IAnswerRepository
 {
     Task<Answer?> GetByIdAsync(int id);

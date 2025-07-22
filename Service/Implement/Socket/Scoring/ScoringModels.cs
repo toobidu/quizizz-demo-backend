@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.DTO.Game;
-
 namespace ConsoleApp1.Service.Implement.Socket.Scoring;
-
 /// <summary>
 /// Class quản lý scoring session của một phòng
 /// </summary>
@@ -13,7 +11,6 @@ public class ScoringSession
     public DateTime LastUpdateTime { get; set; } = DateTime.UtcNow;
     public bool IsGameActive { get; set; } = true;
 }
-
 /// <summary>
 /// Class lưu trữ điểm số chi tiết của từng player
 /// </summary>
@@ -29,7 +26,6 @@ public class PlayerScore
     public List<int> QuestionScores { get; set; } = new(); // Điểm từng câu
     public DateTime LastAnswerTime { get; set; } = DateTime.UtcNow;
 }
-
 /// <summary>
 /// Class để parse scoreboard update data
 /// </summary>
@@ -41,7 +37,6 @@ public class ScoreboardUpdateData
     public int TotalAnswers { get; set; }
     public double AverageTime { get; set; }
 }
-
 /// <summary>
 /// Class chứa kết quả cuối game chi tiết
 /// </summary>

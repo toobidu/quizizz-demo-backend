@@ -1,20 +1,16 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Text.Json;
-
 namespace ConsoleApp1.Service.Implement.Socket.Scoring;
-
 /// <summary>
 /// Service format dữ liệu điểm số cho client
 /// </summary>
 public class ScoreFormatter
 {
     private readonly ScoreCalculator _scoreCalculator;
-
     public ScoreFormatter(ScoreCalculator scoreCalculator)
     {
         _scoreCalculator = scoreCalculator;
     }
-
     /// <summary>
     /// Format scoreboard cho client
     /// </summary>
@@ -24,7 +20,6 @@ public class ScoreFormatter
         {
             var scoreboardJson = JsonSerializer.Serialize(scoreboard);
             var scoreboardList = JsonSerializer.Deserialize<List<ScoreboardEntry>>(scoreboardJson);
-            
             if (scoreboardList != null)
             {
                 return scoreboardList.Select(entry => new {
@@ -43,7 +38,6 @@ public class ScoreFormatter
             return scoreboard;
         }
     }
-
     /// <summary>
     /// Tạo scoreboard cá nhân hóa cho một player
     /// </summary>
@@ -55,7 +49,6 @@ public class ScoreFormatter
             timestamp = DateTime.UtcNow
         };
     }
-
     /// <summary>
     /// Tạo kết quả cá nhân cho một player
     /// </summary>
@@ -64,12 +57,10 @@ public class ScoreFormatter
         var playerRanking = detailedResults.Rankings
             .Cast<dynamic>()
             .FirstOrDefault(r => r.username == playerScore.Username);
-
         var playerAchievements = detailedResults.Achievements
             .Cast<dynamic>()
             .Where(a => a.username == playerScore.Username)
             .ToList();
-
         return new {
             personalStats = new {
                 rank = playerRanking?.rank ?? 0,

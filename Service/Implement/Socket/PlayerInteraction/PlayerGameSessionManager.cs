@@ -1,21 +1,17 @@
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Text.Json;
-
 namespace ConsoleApp1.Service.Implement.Socket.PlayerInteraction;
-
 /// <summary>
 /// Service quản lý player game sessions
 /// </summary>
 public class PlayerGameSessionManager
 {
     private readonly ConcurrentDictionary<string, PlayerGameSession> _gameSessions;
-
     public PlayerGameSessionManager(ConcurrentDictionary<string, PlayerGameSession> gameSessions)
     {
         _gameSessions = gameSessions;
     }
-
     /// <summary>
     /// Lấy game session
     /// </summary>
@@ -24,7 +20,6 @@ public class PlayerGameSessionManager
         _gameSessions.TryGetValue(roomCode, out var session);
         return session;
     }
-
     /// <summary>
     /// Kiểm tra game session có active không
     /// </summary>
@@ -32,7 +27,6 @@ public class PlayerGameSessionManager
     {
         return _gameSessions.TryGetValue(roomCode, out var session) && session.IsGameActive;
     }
-
     /// <summary>
     /// Lấy hoặc tạo player result
     /// </summary>
@@ -40,16 +34,13 @@ public class PlayerGameSessionManager
     {
         var gameSession = GetGameSession(roomCode);
         if (gameSession == null) return new PlayerGameResult { Username = username };
-
         if (!gameSession.PlayerResults.TryGetValue(username, out var playerResult))
         {
             playerResult = new PlayerGameResult { Username = username };
             gameSession.PlayerResults[username] = playerResult;
         }
-
         return playerResult;
     }
-
     /// <summary>
     /// Cập nhật player result
     /// </summary>
@@ -58,7 +49,6 @@ public class PlayerGameSessionManager
         var playerResult = GetOrCreatePlayerResult(roomCode, username);
         updateAction(playerResult);
     }
-
     /// <summary>
     /// Parse answer submission từ JSON
     /// </summary>
@@ -71,11 +61,9 @@ public class PlayerGameSessionManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PLAYER] Lỗi phân tích câu trả lời được gửi: {ex.Message}");
             return null;
         }
     }
-
     /// <summary>
     /// Tạo scoreboard từ player results
     /// </summary>
@@ -83,7 +71,6 @@ public class PlayerGameSessionManager
     {
         var gameSession = GetGameSession(roomCode);
         if (gameSession == null) return new List<object>();
-
         return gameSession.PlayerResults.Values
             .Select(p => new {
                 username = p.Username,
@@ -95,7 +82,6 @@ public class PlayerGameSessionManager
             .Cast<object>()
             .ToList();
     }
-
     /// <summary>
     /// Tạo final results
     /// </summary>
@@ -103,7 +89,6 @@ public class PlayerGameSessionManager
     {
         var gameSession = GetGameSession(roomCode);
         if (gameSession == null) return new List<object>();
-
         return gameSession.PlayerResults.Values
             .Select(p => new {
                 username = p.Username,
@@ -116,7 +101,6 @@ public class PlayerGameSessionManager
             .Cast<object>()
             .ToList();
     }
-
     /// <summary>
     /// End game session
     /// </summary>
@@ -127,7 +111,6 @@ public class PlayerGameSessionManager
             gameSession.IsGameActive = false;
         }
     }
-
     /// <summary>
     /// Cleanup game session
     /// </summary>
@@ -135,10 +118,8 @@ public class PlayerGameSessionManager
     {
         if (_gameSessions.TryRemove(roomCode, out var gameSession))
         {
-            Console.WriteLine($"[PLAYER] Player game session cleaned up for room {roomCode}");
         }
     }
-
     /// <summary>
     /// Lấy session statistics
     /// </summary>
@@ -146,7 +127,6 @@ public class PlayerGameSessionManager
     {
         var totalSessions = _gameSessions.Count;
         var activeSessions = _gameSessions.Values.Count(s => s.IsGameActive);
-
         return new
         {
             totalSessions,

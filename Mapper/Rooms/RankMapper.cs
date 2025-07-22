@@ -1,6 +1,5 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Questions;
-
 namespace ConsoleApp1.Mapper.Rooms;
 public static class RankMapper
 {
@@ -14,7 +13,6 @@ public static class RankMapper
             updatedAt: rank.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")
         );
     }
-
     public static Rank ToEntity(RankDTO rankDto)
     {
         return new Rank(

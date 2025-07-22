@@ -1,11 +1,8 @@
 using ConsoleApp1.Model.DTO.Game;
-
 namespace ConsoleApp1.Service.Implement.Socket.GameFlow;
-
 /// <summary>
 /// Models cho Game Flow Service
 /// </summary>
-
 /// <summary>
 /// Class nội bộ để quản lý session của một game
 /// </summary>
@@ -22,7 +19,6 @@ public class GameSession
     public Timer? CountdownTimer { get; set; }
     public Dictionary<string, PlayerGameProgress> PlayerProgress { get; set; } = new();
 }
-
 /// <summary>
 /// Class theo dõi tiến độ của từng người chơi
 /// </summary>
@@ -35,7 +31,6 @@ public class PlayerGameProgress
     public bool HasFinished { get; set; } = false;
     public DateTime LastActivityTime { get; set; } = DateTime.UtcNow;
 }
-
 /// <summary>
 /// Game start event data
 /// </summary>
@@ -47,7 +42,6 @@ public class GameStartEventData
     public int? TimeLimit { get; set; }
     public int? TotalQuestions { get; set; }
 }
-
 /// <summary>
 /// Question event data
 /// </summary>
@@ -59,7 +53,6 @@ public class QuestionEventData
     public int TimeRemaining { get; set; }
     public string GameState { get; set; } = string.Empty;
 }
-
 /// <summary>
 /// Timer update event data
 /// </summary>
@@ -69,7 +62,6 @@ public class TimerUpdateEventData
     public int TotalTime { get; set; }
     public string GameState { get; set; } = string.Empty;
 }
-
 /// <summary>
 /// Player progress event data
 /// </summary>
@@ -82,7 +74,6 @@ public class PlayerProgressEventData
     public bool HasFinished { get; set; }
     public int TimeRemaining { get; set; }
 }
-
 /// <summary>
 /// Progress update broadcast data
 /// </summary>
@@ -92,7 +83,6 @@ public class ProgressUpdateEventData
     public string GameState { get; set; } = string.Empty;
     public int TimeRemaining { get; set; }
 }
-
 /// <summary>
 /// Countdown event data
 /// </summary>
@@ -101,7 +91,6 @@ public class CountdownEventData
     public int Count { get; set; }
     public string Message { get; set; } = string.Empty;
 }
-
 /// <summary>
 /// Game end event data
 /// </summary>

@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Config;
-
 public class EmailConfig
 {
     public string SmtpHost { get; set; } = "smtp.gmail.com";

@@ -1,7 +1,5 @@
-﻿using ConsoleApp1.Model.Entity.Users;
-
+using ConsoleApp1.Model.Entity.Users;
 namespace ConsoleApp1.Repository.Interface;
-
 public interface IPermissionRepository
 {
     Task<Permission?> GetByIdAsync(int id);

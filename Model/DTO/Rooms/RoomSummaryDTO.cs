@@ -1,5 +1,4 @@
-﻿namespace ConsoleApp1.Model.DTO.Rooms;
-
+namespace ConsoleApp1.Model.DTO.Rooms;
 public class RoomSummaryDTO
 {
     public string RoomCode { get; set; }
@@ -12,7 +11,6 @@ public class RoomSummaryDTO
     public int QuestionCount { get; set; }
     public int CountdownTime { get; set; }
     public bool CanJoin { get; set; }
-    
     public RoomSummaryDTO(string roomCode, string roomName, bool isPrivate, int playerCount, int maxPlayers, 
                          string status, string? topicName = null, int questionCount = 0, int countdownTime = 0)
     {

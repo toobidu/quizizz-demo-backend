@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Rooms;
+using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
-
 namespace ConsoleApp1.Mapper;
-
 public static class CreateRoomRequestMapper
 {
     public static Room ToEntity(CreateRoomRequest request, int ownerId)

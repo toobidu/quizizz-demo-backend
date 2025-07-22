@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Model.DTO.Rooms;
-
 public class RoomDetailsDTO
 {
     public int Id { get; set; }

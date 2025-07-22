@@ -1,7 +1,5 @@
 namespace ConsoleApp1.Model.DTO.Rooms.Games;
-
 using ConsoleApp1.Model.DTO.Questions;
-
 public class GameQuestionDTO
 {
     public int GameSessionId { get; set; }

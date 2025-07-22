@@ -1,8 +1,6 @@
-﻿using ConsoleApp1.Model.DTO.Questions;
+using ConsoleApp1.Model.DTO.Questions;
 using ConsoleApp1.Model.Entity.Questions;
-
 namespace ConsoleApp1.Mapper.Questions;
-
 public static class QuestionTypeMapper
 {
     public static QuestionTypeDTO ToDTO(QuestionType questionType)
@@ -12,7 +10,6 @@ public static class QuestionTypeMapper
             name: questionType.Name
         );
     }
-
     public static QuestionType ToEntity(QuestionTypeDTO dto)
     {
         return new QuestionType(

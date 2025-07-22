@@ -1,5 +1,4 @@
 namespace ConsoleApp1.Service.Implement.Socket.RoomManagement;
-
 /// <summary>
 /// Constants cho Room Management Service
 /// </summary>
@@ -16,7 +15,6 @@ public static class RoomManagementConstants
         public const string PlayerLeft = "player-left";
         public const string RoomDeleted = "room-deleted";
     }
-
     /// <summary>
     /// Game states
     /// </summary>
@@ -27,7 +25,6 @@ public static class RoomManagementConstants
         public const string Playing = "playing";
         public const string Finished = "finished";
     }
-
     /// <summary>
     /// Player statuses
     /// </summary>
@@ -38,7 +35,6 @@ public static class RoomManagementConstants
         public const string Waiting = "waiting";
         public const string Playing = "playing";
     }
-
     /// <summary>
     /// Room limits
     /// </summary>
@@ -50,7 +46,6 @@ public static class RoomManagementConstants
         public const int MinUsernameLength = 2;
         public const int MaxUsernameLength = 50;
     }
-
     /// <summary>
     /// Messages
     /// </summary>

@@ -1,7 +1,5 @@
 using ConsoleApp1.Model.DTO.Game;
-
 namespace ConsoleApp1.Service.Implement.Socket.Scoring;
-
 /// <summary>
 /// Extension methods cho Scoring Services
 /// </summary>
@@ -14,7 +12,6 @@ public static class ScoringServiceExtensions
     {
         return playerScore.TotalAnswers > 0 && playerScore.CorrectAnswers == playerScore.TotalAnswers;
     }
-
     /// <summary>
     /// Tính accuracy percentage
     /// </summary>
@@ -24,7 +21,6 @@ public static class ScoringServiceExtensions
             ? (double)playerScore.CorrectAnswers / playerScore.TotalAnswers * 100 
             : 0;
     }
-
     /// <summary>
     /// Kiểm tra xem session có đang active không
     /// </summary>
@@ -34,7 +30,6 @@ public static class ScoringServiceExtensions
                session.PlayerScores.Count > 0 && 
                DateTime.UtcNow.Subtract(session.LastUpdateTime).TotalMinutes < 30; // 30 phút timeout
     }
-
     /// <summary>
     /// Lấy top N players
     /// </summary>
@@ -42,7 +37,6 @@ public static class ScoringServiceExtensions
     {
         return scoreboard.Take(count).ToList();
     }
-
     /// <summary>
     /// Tìm player trong scoreboard
     /// </summary>
@@ -50,7 +44,6 @@ public static class ScoringServiceExtensions
     {
         return scoreboard.FirstOrDefault(entry => entry.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
     }
-
     /// <summary>
     /// Kiểm tra xem có thay đổi vị trí không
     /// </summary>
@@ -58,7 +51,6 @@ public static class ScoringServiceExtensions
     {
         return positionChanges.Count > 0;
     }
-
     /// <summary>
     /// Format thời gian hiển thị
     /// </summary>
@@ -66,12 +58,10 @@ public static class ScoringServiceExtensions
     {
         if (seconds < 60)
             return $"{seconds:F1}s";
-        
         var minutes = (int)(seconds / 60);
         var remainingSeconds = seconds % 60;
         return $"{minutes}m {remainingSeconds:F1}s";
     }
-
     /// <summary>
     /// Tính điểm trung bình của session
     /// </summary>
@@ -81,7 +71,6 @@ public static class ScoringServiceExtensions
             ? session.PlayerScores.Values.Average(p => p.TotalScore) 
             : 0;
     }
-
     /// <summary>
     /// Lấy player có điểm cao nhất
     /// </summary>
@@ -92,7 +81,6 @@ public static class ScoringServiceExtensions
             .ThenBy(p => p.AverageTime)
             .FirstOrDefault();
     }
-
     /// <summary>
     /// Kiểm tra xem có đủ players để bắt đầu game không
     /// </summary>
@@ -100,7 +88,6 @@ public static class ScoringServiceExtensions
     {
         return session.PlayerScores.Count >= minimumCount;
     }
-
     /// <summary>
     /// Tạo summary statistics
     /// </summary>
@@ -110,11 +97,9 @@ public static class ScoringServiceExtensions
         {
             return new { message = "No players in session" };
         }
-
         var scores = session.PlayerScores.Values.Select(p => p.TotalScore).ToList();
         var accuracies = session.PlayerScores.Values.Select(p => p.GetAccuracyPercentage()).ToList();
         var times = session.PlayerScores.Values.Where(p => p.AverageTime > 0).Select(p => p.AverageTime).ToList();
-
         return new {
             totalPlayers = session.PlayerScores.Count,
             averageScore = scores.Average(),
