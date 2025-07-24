@@ -35,7 +35,7 @@ public class RolePermissionServiceImplement : IRolePermissionService
         var permission = await _permissionRepo.GetByIdAsync(permissionId);
         var role = await _roleRepo.GetByIdAsync(roleId);
         if (permission == null || role == null)
-            throw new Exception("Permission ho?c Role kh�ng t?n t?i");
+            throw new Exception("Permission hoặc Role không tồn tại");
         var rolePermission = RolePermissionMapper.ToEntity(new RolePermissionDTO(roleId, permissionId));
         await _rolePermissionRepo.AddAsync(rolePermission);
         await UpdateRedisPermissionsForRole(roleId);

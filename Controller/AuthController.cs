@@ -34,7 +34,7 @@ public class AuthController
         }
         catch (Exception ex)
         {
-            return ApiResponse<string>.Fail("L?i m�y ch?: " + ex.Message, 500, "SERVER_ERROR", "/api/auth/register");
+            return ApiResponse<string>.Fail("Lỗi máy chủ: " + ex.Message, 500, "SERVER_ERROR", "/api/auth/register");
         }
     }
     /// <summary>

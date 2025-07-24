@@ -42,7 +42,7 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
     }
     public async Task<int> AddAsync(RoomPlayer roomPlayer)
     {
-        // Ki?m tra duplicate tru?c khi th�m
+        // Kiểm tra duplicate trước khi thêm
         var existing = await GetByUserIdAndRoomIdAsync(roomPlayer.UserId, roomPlayer.RoomId);
         if (existing != null)
         {
@@ -68,14 +68,14 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
     }
     public async Task<bool> DeleteByUserIdAndRoomIdAsync(int userId, int roomId)
     {
-        // Ki?m tra tru?c khi x�a
+        // Kiểm tra trước khi xóa
         const string checkQuery = @"SELECT COUNT(*) FROM room_players WHERE user_id = @UserId AND room_id = @RoomId";
         using var conn = CreateConnection();
         var existsBefore = await conn.ExecuteScalarAsync<int>(checkQuery, new { UserId = userId, RoomId = roomId });
         const string query = @"DELETE FROM room_players 
                                WHERE user_id = @UserId AND room_id = @RoomId";
         var affected = await conn.ExecuteAsync(query, new { UserId = userId, RoomId = roomId });
-        // Ki?m tra sau khi x�a
+        // Kiểm tra sau khi xóa
         var existsAfter = await conn.ExecuteScalarAsync<int>(checkQuery, new { UserId = userId, RoomId = roomId });
         return affected > 0;
     }

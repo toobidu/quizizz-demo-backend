@@ -17,7 +17,7 @@ public class AuthRouter : IBaseRouter
         string path = request.Url?.AbsolutePath ?? "";
         string method = request.HttpMethod;
         if (!path.StartsWith("/api/auth")) return false;
-        // X? lý yêu c?u CORS preflight
+        // Xá»­ lÃ½ yÃªu cáº§u CORS preflight
         if (method.ToUpper() == "OPTIONS")
         {
             HttpResponseHelper.WriteOptionsResponse(response);
@@ -32,7 +32,7 @@ public class AuthRouter : IBaseRouter
                     var registerDto = await Deserialize<RegisterRequest>(request);
                     if (registerDto == null)
                     {
-                        HttpResponseHelper.WriteBadRequest(response, "D? li?u dang ký không h?p l?", path);
+                        HttpResponseHelper.WriteBadRequest(response, "D? li?u dang kï¿½ khï¿½ng h?p l?", path);
                         return true;
                     }
                     var apiResponse = await _authController.RegisterApi(registerDto);
@@ -44,7 +44,7 @@ public class AuthRouter : IBaseRouter
                     var loginDto = await Deserialize<LoginRequest>(request);
                     if (loginDto == null)
                     {
-                        HttpResponseHelper.WriteBadRequest(response, "D? li?u dang nh?p không h?p l?", path);
+                        HttpResponseHelper.WriteBadRequest(response, "D? li?u dang nh?p khï¿½ng h?p l?", path);
                         return true;
                     }
                     var apiResponse = await _authController.LoginApi(loginDto);
@@ -65,7 +65,7 @@ public class AuthRouter : IBaseRouter
                     return true;
                 }
                 default:
-                    HttpResponseHelper.WriteNotFound(response, "Không tìm th?y API yêu c?u", path);
+                    HttpResponseHelper.WriteNotFound(response, "Khï¿½ng tï¿½m th?y API yï¿½u c?u", path);
                     return true;
             }
         }

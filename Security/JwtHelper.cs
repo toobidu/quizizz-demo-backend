@@ -15,12 +15,12 @@ public class JwtHelper
         key = Encoding.UTF8.GetBytes(config.JwtKey);
     }
     /// <summary>
-    /// Sinh Access Token d?ng JWT d?a v�o th�ng tin ngu?i d�ng.
+    /// Sinh Access Token dạng JWT dựa vào thông tin người dùng.
     /// </summary>
-    /// <param name="userId">ID ngu?i d�ng.</param>
-    /// <param name="username">T�n dang nh?p.</param>
-    /// <param name="typeAccount">Lo?i t�i kho?n (Admin/Player).</param>
-    /// <returns>Chu?i JWT h?p l?.</returns>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="username">T�n dang nh?p.</param>
+    /// <param name="typeAccount">Loại tài khoản (Admin/Player).</param>
+    /// <returns>Chuỗi JWT hợp lệ.</returns>
     public string GenerateAccessToken(int userId, string username, string typeAccount)
     {
         if (string.IsNullOrEmpty(config.JwtKey))

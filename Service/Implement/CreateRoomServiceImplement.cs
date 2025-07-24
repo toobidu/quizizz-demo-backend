@@ -37,7 +37,7 @@ public class CreateRoomServiceImplement : ICreateRoomService
     }
     public async Task<RoomDTO> CreateRoomAsync(CreateRoomRequest request, int userId)
     {
-        // Ki?m tra user d� ? trong ph�ng n�o chua
+        // Kiểm tra user đã ở trong phòng nào chưa
         var existingRoom = await _roomPlayerRepository.GetActiveRoomByUserIdAsync(userId);
         if (existingRoom != null)
         {
@@ -59,7 +59,7 @@ public class CreateRoomServiceImplement : ICreateRoomService
         room.Id = roomId;
         await SetupRoomSettingsAsync(roomId, request);
         await UpdateUserTypeAccountAsync(room.OwnerId);
-        // Ki?m tra xem owner d� ? trong ph�ng chua (tr�nh duplicate)
+        // Kiểm tra xem owner đã ở trong phòng chưa (tránh duplicate)
         var existingPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
         if (existingPlayer == null)
         {
@@ -76,7 +76,7 @@ public class CreateRoomServiceImplement : ICreateRoomService
                 UpdatedAt = DateTime.UtcNow
             };
             var addResult = await _roomPlayerRepository.AddAsync(roomPlayer);
-            // X�c nh?n l?i b?ng c�ch query
+            // Xác nhận lại bằng cách query
             var confirmPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
             if (confirmPlayer != null)
             {
@@ -88,7 +88,7 @@ public class CreateRoomServiceImplement : ICreateRoomService
         else
         {
         }
-        // Ki?m tra s? lu?ng player trong ph�ng sau khi t?o
+        // Kiểm tra số lượng player trong phòng sau khi tạo
         var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         var roomDto = RoomMapper.ToDTO(room);

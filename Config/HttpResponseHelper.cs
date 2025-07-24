@@ -8,7 +8,7 @@ public static class HttpResponseHelper
         SetCorsHeaders(response);
         response.StatusCode = apiResponse.Status;
         response.ContentType = "application/json";
-        // S? d?ng JsonSerializerConfig d? d?m b?o camelCase format
+        // Sử dụng JsonSerializerConfig để đảm bảo camelCase format
         string json = JsonSerializerConfig.SerializeCamelCase(apiResponse);
         using var writer = new StreamWriter(response.OutputStream);
         writer.Write(json);

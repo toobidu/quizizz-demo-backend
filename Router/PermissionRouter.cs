@@ -20,7 +20,7 @@ public class PermissionRouter : IBaseRouter
         string? token = GetAccessToken(request);
         if (token == null)
         {
-            HttpResponseHelper.WriteUnauthorized(response, "Thi?u ho?c sai thÙng tin x·c th?c", path);
+            HttpResponseHelper.WriteUnauthorized(response, "Thi?u ho?c sai thÔøΩng tin xÔøΩc th?c", path);
             return true;
         }
         try
@@ -28,7 +28,7 @@ public class PermissionRouter : IBaseRouter
             if (method == "GET" && path == "/api/permissions")
             {
                 var result = await _permissionController.GetAllPermissionsAsync(token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y danh s·ch quy?n th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "L?y danh sÔøΩch quy?n thÔøΩnh cÔøΩng", path);
                 return true;
             }
             if (method == "GET" && path.StartsWith("/api/permissions/") &&
@@ -37,11 +37,11 @@ public class PermissionRouter : IBaseRouter
                 var result = await _permissionController.GetPermissionByIdAsync(id, token);
                 if (result != null)
                 {
-                    HttpResponseHelper.WriteSuccess(response, result, "L?y chi ti?t quy?n th‡nh cÙng", path);
+                    HttpResponseHelper.WriteSuccess(response, result, "L?y chi ti?t quy?n thÔøΩnh cÔøΩng", path);
                 }
                 else
                 {
-                    HttpResponseHelper.WriteNotFound(response, "KhÙng tÏm th?y quy?n", path);
+                    HttpResponseHelper.WriteNotFound(response, "KhÔøΩng tÔøΩm th?y quy?n", path);
                 }
                 return true;
             }
@@ -55,21 +55,21 @@ public class PermissionRouter : IBaseRouter
                 }
                 string permissionName = segments[4];
                 var exists = await _permissionController.PermissionNameExistsAsync(permissionName, token);
-                HttpResponseHelper.WriteSuccess(response, new { exists }, "Ki?m tra quy?n t?n t?i", path);
+                HttpResponseHelper.WriteSuccess(response, new { exists }, "Ki·ªÉm tra quy·ªÅn t·ªìn t·∫°i", path);
                 return true;
             }
             if (method == "POST" && path == "/api/permissions")
             {
                 var dto = await ParseJson<PermissionDTO>(request);
                 var message = await _permissionController.CreatePermissionAsync(dto, token);
-                HttpResponseHelper.WriteSuccess(response, message, "T?o quy?n", path);
+                HttpResponseHelper.WriteSuccess(response, message, "T·∫°o quy·ªÅn", path);
                 return true;
             }
             if (method == "PUT" && path == "/api/permissions")
             {
                 var dto = await ParseJson<PermissionDTO>(request);
                 var message = await _permissionController.UpdatePermissionAsync(dto, token);
-                HttpResponseHelper.WriteSuccess(response, message, "C?p nh?t quy?n", path);
+                HttpResponseHelper.WriteSuccess(response, message, "C·∫≠p nh·∫≠t quy·ªÅn", path);
                 return true;
             }
             if (method == "DELETE" && path.StartsWith("/api/permissions/") &&
@@ -79,7 +79,7 @@ public class PermissionRouter : IBaseRouter
                 HttpResponseHelper.WriteSuccess(response, new { id = deleteId }, message, path);
                 return true;
             }
-            HttpResponseHelper.WriteNotFound(response, "KhÙng tÏm th?y API yÍu c?u", path);
+            HttpResponseHelper.WriteNotFound(response, "KhÔøΩng tÔøΩm th?y API yÔøΩu c?u", path);
             return true;
         }
         catch (Exception ex)

@@ -11,7 +11,7 @@ public class CreateRoomRequest
     // Computed properties for backward compatibility
     public int MaxPlayers => Settings?.MaxPlayers ?? 0;
     public string GameMode => Settings?.GameMode ?? "battle";
-    public int? TopicId => Settings?.TopicId ?? 1; // L?y tr?c ti?p t? Settings
+    public int? TopicId => Settings?.TopicId ?? 1; // Lấy trực tiếp từ Settings
     public int? QuestionCount => Settings?.QuestionCount;
     public int? CountdownSeconds => Settings?.TimeLimit;
     public bool ValidField()

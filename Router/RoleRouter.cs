@@ -20,7 +20,7 @@ public class RoleRouter : IBaseRouter
         string? token = GetAccessToken(request);
         if (token == null)
         {
-            HttpResponseHelper.WriteUnauthorized(response, "Thi?u ho?c sai thÙng tin x·c th?c", path);
+            HttpResponseHelper.WriteUnauthorized(response, "Thi?u ho?c sai thÔøΩng tin xÔøΩc th?c", path);
             return true;
         }
         try
@@ -28,7 +28,7 @@ public class RoleRouter : IBaseRouter
             if (method == "GET" && path == "/api/roles")
             {
                 var result = await _roleController.GetAllRolesAsync(token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y danh s·ch vai trÚ th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "L?y danh sÔøΩch vai trÔøΩ thÔøΩnh cÔøΩng", path);
                 return true;
             }
             if (method == "GET" && path.StartsWith("/api/roles/exists/"))
@@ -41,42 +41,42 @@ public class RoleRouter : IBaseRouter
                 }
                 string roleName = segments[4];
                 var result = await _roleController.RoleNameExistsAsync(roleName, token);
-                HttpResponseHelper.WriteSuccess(response, new { exists = result }, "Ki?m tra vai trÚ t?n t?i", path);
+                HttpResponseHelper.WriteSuccess(response, new { exists = result }, "Ki·ªÉm tra vai tr√≤ t·ªìn t·∫°i", path);
                 return true;
             }
             if (method == "GET" && path.StartsWith("/api/roles/permission/") &&
                 int.TryParse(path.Split("/")[4], out int permissionId))
             {
                 var result = await _roleController.GetRolesByPermissionIdAsync(permissionId, token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y vai trÚ theo quy?n th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "L?y vai trÔøΩ theo quy?n thÔøΩnh cÔøΩng", path);
                 return true;
             }
             if (method == "GET" && path.StartsWith("/api/roles/user/") &&
                 int.TryParse(path.Split("/")[4], out int userId))
             {
                 var result = await _roleController.GetRolesByUserIdAsync(userId, token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y vai trÚ theo ngu?i d˘ng th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "L·∫•y vai tr√≤ theo ng∆∞·ªùi d√πng th√†nh c√¥ng", path);
                 return true;
             }
             if (method == "GET" && path.StartsWith("/api/roles/") &&
                 int.TryParse(path.Split("/")[3], out int id))
             {
                 var result = await _roleController.GetRoleByIdAsync(id, token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y chi ti?t vai trÚ th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "L?y chi ti?t vai trÔøΩ thÔøΩnh cÔøΩng", path);
                 return true;
             }
             if (method == "POST" && path == "/api/roles")
             {
                 var dto = await ParseJson<RoleDTO>(request);
                 var result = await _roleController.CreateRoleAsync(dto, token);
-                HttpResponseHelper.WriteSuccess(response, result, "T?o vai trÚ m?i th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "T·∫°o vai tr√≤ m·ªõi th√†nh c√¥ng", path);
                 return true;
             }
             if (method == "PUT" && path == "/api/roles")
             {
                 var dto = await ParseJson<RoleDTO>(request);
                 var result = await _roleController.UpdateRoleAsync(dto, token);
-                HttpResponseHelper.WriteSuccess(response, result, "C?p nh?t vai trÚ th‡nh cÙng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "C·∫≠p nh·∫≠t vai tr√≤ th√†nh c√¥ng", path);
                 return true;
             }
             if (method == "DELETE" && path.StartsWith("/api/roles/") &&
@@ -96,10 +96,10 @@ public class RoleRouter : IBaseRouter
                 }
                 var permissionNames = await ParseJson<List<string>>(request);
                 var result = await _roleController.GetRolesByUserIdAndPermissionNamesAsync(uid, permissionNames, token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y vai trÚ theo quy?n v‡ ngu?i d˘ng", path);
+                HttpResponseHelper.WriteSuccess(response, result, "L·∫•y vai tr√≤ theo quy·ªÅn v√† ng∆∞·ªùi d√πng", path);
                 return true;
             }
-            HttpResponseHelper.WriteNotFound(response, "KhÙng tÏm th?y API yÍu c?u", path);
+            HttpResponseHelper.WriteNotFound(response, "KhÔøΩng tÔøΩm th?y API yÔøΩu c?u", path);
             return true;
         }
         catch (Exception ex)

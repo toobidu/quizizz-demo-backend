@@ -21,7 +21,7 @@ public class UserRouter : IBaseRouter
         string? token = GetAccessToken(request);
         if (token == null)
         {
-            HttpResponseHelper.WriteUnauthorized(response, "Thi?u ho?c sai token xác th?c", path);
+            HttpResponseHelper.WriteUnauthorized(response, "Thi?u ho?c sai token xï¿½c th?c", path);
             return true;
         }
         try
@@ -38,7 +38,7 @@ public class UserRouter : IBaseRouter
             if (method == "GET" && path == "/api/users")
             {
                 var result = await _userController.GetAllUsersAsync(token);
-                HttpResponseHelper.WriteSuccess(response, result, "L?y danh sách ngu?i dùng thành công", path);
+                HttpResponseHelper.WriteSuccess(response, result, "Láº¥y danh sÃ¡ch ngÆ°á»i dÃ¹ng thÃ nh cÃ´ng", path);
                 return true;
             }
             // GET /api/users/{userId}
@@ -48,9 +48,9 @@ public class UserRouter : IBaseRouter
             {
                 var result = await _userController.GetUserByIdAsync(getId, token);
                 if (result == null)
-                    HttpResponseHelper.WriteNotFound(response, "Không tìm th?y ngu?i dùng", path);
+                    HttpResponseHelper.WriteNotFound(response, "KhÃ´ng tÃ¬m tháº¥y ngÆ°á»i dÃ¹ng", path);
                 else
-                    HttpResponseHelper.WriteSuccess(response, result, "L?y thông tin ngu?i dùng thành công", path);
+                    HttpResponseHelper.WriteSuccess(response, result, "Láº¥y thÃ´ng tin ngÆ°á»i dÃ¹ng thÃ nh cÃ´ng", path);
                 return true;
             }
             // PUT /api/users/{userId}
@@ -91,9 +91,9 @@ public class UserRouter : IBaseRouter
             {
                 var result = await _userController.GetTypeAccountAsync(getTypeId, token);
                 if (result == null)
-                    HttpResponseHelper.WriteUnauthorized(response, "Không th? l?y lo?i tài kho?n", path);
+                    HttpResponseHelper.WriteUnauthorized(response, "Khï¿½ng th? l?y lo?i tï¿½i kho?n", path);
                 else
-                    HttpResponseHelper.WriteSuccess(response, new { typeAccount = result }, "L?y lo?i tài kho?n thành công", path);
+                    HttpResponseHelper.WriteSuccess(response, new { typeAccount = result }, "L?y lo?i tï¿½i kho?n thï¿½nh cï¿½ng", path);
                 return true;
             }
             // GET /api/users/map-role?typeAccount={typeAccount}
@@ -107,10 +107,10 @@ public class UserRouter : IBaseRouter
                     return true;
                 }
                 var roleId = await _userController.MapTypeAccountToRoleIdAsync(typeAccount, token);
-                HttpResponseHelper.WriteSuccess(response, new { roleId }, "Ánh x? thành công", path);
+                HttpResponseHelper.WriteSuccess(response, new { roleId }, "ï¿½nh x? thï¿½nh cï¿½ng", path);
                 return true;
             }
-            HttpResponseHelper.WriteNotFound(response, "Không tìm th?y API yêu c?u", path);
+            HttpResponseHelper.WriteNotFound(response, "Khï¿½ng tï¿½m th?y API yï¿½u c?u", path);
             return true;
         }
         catch (Exception ex)

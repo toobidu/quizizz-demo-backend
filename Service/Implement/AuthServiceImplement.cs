@@ -110,7 +110,7 @@ public class AuthServiceImplement : IAuthService
         {
             return null;
         }
-        //L?y danh s�ch quy?n t? userId 
+        // Lấy danh sách quyền từ userId 
         var permissionNames = (await _permissionRepo.GetPermissionsByUserIdAsync(user.Id)).Distinct().ToList();
         if (permissionNames.Any())
         {
@@ -175,7 +175,7 @@ public class AuthServiceImplement : IAuthService
             var hash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
             user.Password = hash;
             await _userRepo.UpdateUserAsync(user);
-            // Trong ?ng d?ng th?c t?, g?i m?t kh?u t?m th?i qua email
+            // Trong ứng dụng thực tế, gửi mật khẩu tạm thời qua email
             return true;
         }
         catch (Exception ex)
@@ -192,12 +192,12 @@ public class AuthServiceImplement : IAuthService
             {
                 return false;
             }
-            // T?o m� OTP 6 k� t?
+            // Tạo mã OTP 6 ký tự
             string otpCode = GenerateOtpCode();
-            // Luu OTP v�o Redis v?i th?i gian h?t h?n 5 ph�t
+            // Lưu OTP vào Redis với thời gian hết hạn 5 phút
             string otpKey = $"forgot_password_otp:{email?.Trim()}";
             await _redisService.SetStringAsync(otpKey, otpCode, TimeSpan.FromMinutes(5));
-            // G?i OTP qua email
+            // Gửi OTP qua email
             bool emailSent = await _emailService.SendOtpEmailAsync(email?.Trim() ?? string.Empty, otpCode);
             if (!emailSent)
             {
@@ -234,7 +234,7 @@ public class AuthServiceImplement : IAuthService
     {
         try
         {
-            // X�c th?c OTP tru?c
+            // Xác thực OTP trước
             if (!await VerifyOtpAsync(email, otpCode))
             {
                 return false;
@@ -254,7 +254,7 @@ public class AuthServiceImplement : IAuthService
             var hash = BCrypt.Net.BCrypt.HashPassword(newPassword);
             user.Password = hash;
             await _userRepo.UpdateUserAsync(user);
-            // X�a OTP sau khi s? d?ng th�nh c�ng
+            // Xóa OTP sau khi sử dụng thành công
             string otpKey = $"forgot_password_otp:{email}";
             await _redisService.DeleteAsync(otpKey);
             return true;

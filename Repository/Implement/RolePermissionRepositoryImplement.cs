@@ -50,7 +50,7 @@ public class RolePermissionRepositoryImplement : IRolePermissionRepository
         const string query = @"
             INSERT INTO role_permissions (role_id, permission_id)
             VALUES (@RoleId, @PermissionId)
-            RETURNING role_id"; // ho?c RETURNING permission_id n?u b?n mu?n l?y c�i n�o
+            RETURNING role_id"; // hoặc RETURNING permission_id nếu bạn muốn lấy cái nào
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, rolePermission);
     }
