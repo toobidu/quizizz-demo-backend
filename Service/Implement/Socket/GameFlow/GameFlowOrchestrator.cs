@@ -42,7 +42,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _lifecycleManager.BatDauGameDonGianAsync(roomId);
+            await _lifecycleManager.StartSimpleGameAsync(roomId);
         }
         catch (Exception ex)
         {
@@ -55,7 +55,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _lifecycleManager.BatDauGameVoiCauHoiAsync(roomId, question, timeLimit);
+            await _lifecycleManager.StartGameWithQuestionsAsync(roomId, question, timeLimit);
         }
         catch (Exception ex)
         {
@@ -68,7 +68,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _questionManager.GuiCauHoiTiepTheoChoNguoiChoiAsync(roomId, playerName);
+            await _questionManager.SendNextQuestionToPlayerAsync(roomId, playerName);
         }
         catch (Exception ex)
         {
@@ -81,7 +81,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _questionManager.GuiCauHoiAsync(roomId, question, questionPosition, totalQuestions);
+            await _questionManager.SendQuestionAsync(roomId, question, questionPosition, totalQuestions);
         }
         catch (Exception ex)
         {
@@ -94,7 +94,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _progressTracker.GuiCapNhatThoiGianGameAsync(roomId);
+            await _progressTracker.SendGameTimeUpdateAsync(roomId);
         }
         catch (Exception ex)
         {
@@ -107,7 +107,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _progressTracker.LayTienDoNguoiChoiAsync(roomId, playerName);
+            await _progressTracker.GetPlayerProgressAsync(roomId, playerName);
         }
         catch (Exception ex)
         {
@@ -120,7 +120,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _progressTracker.BroadcastTienDoNguoiChoiAsync(roomId);
+            await _progressTracker.BroadcastPlayerProgressAsync(roomId);
         }
         catch (Exception ex)
         {
@@ -133,7 +133,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _lifecycleManager.DonDepGameSessionAsync(roomId);
+            await _lifecycleManager.CleanupGameSessionAsync(roomId);
         }
         catch (Exception ex)
         {
@@ -146,7 +146,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _lifecycleManager.CapNhatTrangThaiGameAsync(roomId, state);
+            await _lifecycleManager.UpdateGameStateAsync(roomId, state);
         }
         catch (Exception ex)
         {
@@ -159,7 +159,7 @@ public class GameFlowOrchestrator
     {
         try
         {
-            await _lifecycleManager.GuiDemNguocAsync(roomId, countdown);
+            await _lifecycleManager.SendCountdownAsync(roomId, countdown);
         }
         catch (Exception ex)
         {

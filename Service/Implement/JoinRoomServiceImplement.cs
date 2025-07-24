@@ -71,13 +71,24 @@ public class JoinRoomServiceImplement : IJoinRoomService
             {
             }
         }
-        var roomPlayer = new RoomPlayer(roomId, playerId, 0, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow);
+        var roomPlayer = new RoomPlayer 
+        {
+            RoomId = roomId,
+            UserId = playerId,
+            Score = 0,
+            TimeTaken = TimeSpan.Zero,
+            Status = "waiting",
+            SocketId = "",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
         await _roomPlayerRepository.AddAsync(roomPlayer);
         var newPlayerCount = playerCount + 1;
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         if (newPlayerCount >= room.MaxPlayers)
         {
-            room = await _roomRepository.UpdateStatusAsync(roomId, "ready");
+            await _roomRepository.UpdateStatusAsync(roomId, "ready");
+            room = await _roomRepository.GetByIdAsync(roomId);
         }
         var finalPlayerCount = await _roomRepository.GetPlayerCountAsync(roomId);
         // Broadcast update qua cả WebSocket và HTTP
@@ -130,13 +141,24 @@ public class JoinRoomServiceImplement : IJoinRoomService
             {
             }
         }
-        var roomPlayer = new RoomPlayer(room.Id, playerId, 0, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow);
+        var roomPlayer = new RoomPlayer 
+        {
+            RoomId = room.Id,
+            UserId = playerId,
+            Score = 0,
+            TimeTaken = TimeSpan.Zero,
+            Status = "waiting",
+            SocketId = "",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
         await _roomPlayerRepository.AddAsync(roomPlayer);
         var newPlayerCount = playerCount + 1;
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         if (newPlayerCount >= room.MaxPlayers)
         {
-            room = await _roomRepository.UpdateStatusAsync(room.Id, "ready");
+            await _roomRepository.UpdateStatusAsync(room.Id, "ready");
+            room = await _roomRepository.GetByIdAsync(room.Id);
         }
         var finalPlayerCount = await _roomRepository.GetPlayerCountAsync(room.Id);
         // Broadcast update qua cả WebSocket và HTTP
@@ -268,10 +290,16 @@ public class JoinRoomServiceImplement : IJoinRoomService
             var user = await _userRepository.GetByIdAsync(rp.UserId);
             if (user != null)
             {
-                result.Add(new PlayerInRoomDTO(user.Id, user.Username, rp.Score, rp.TimeTaken));
-            }
-            else
-            {
+                result.Add(new PlayerInRoomDTO
+                {
+                    UserId = user.Id,
+                    Username = user.Username,
+                    Score = rp.Score,
+                    TimeTaken = rp.TimeTaken,
+                    Status = rp.Status,
+                    SocketId = rp.SocketId,
+                    LastActivity = rp.LastActivity
+                });
             }
         }
         // Tìm roomCode để gửi broadcast cập nhật

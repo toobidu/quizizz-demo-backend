@@ -1,4 +1,4 @@
-﻿-- ===============================
+-- ===============================
 -- 1. Hàm cập nhật created_at và updated_at
 -- ===============================
 CREATE OR REPLACE FUNCTION update_timestamp()
@@ -248,15 +248,77 @@ CREATE TABLE ranks
 (
     id           SERIAL PRIMARY KEY,
     user_id      INT       NOT NULL,
-    total_score  INT       NOT NULL,
-    games_played INT       NOT NULL,
+    total_score  INT       NOT NULL DEFAULT 0,
+    games_played INT       NOT NULL DEFAULT 0,
     created_at   TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
     updated_at   TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 CREATE TRIGGER update_ranks_timestamp
-    BEFORE INSERT OR
-UPDATE ON ranks
+    BEFORE INSERT OR UPDATE ON ranks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
+-- ===============================
+-- 15. Bảng game_sessions
+-- ===============================
+CREATE TABLE game_sessions
+(
+    id                   SERIAL PRIMARY KEY,
+    room_id             INT       NOT NULL,
+    game_state          TEXT      NOT NULL,
+    current_question_index INT    NOT NULL DEFAULT 0,
+    start_time          TIMESTAMP,
+    end_time            TIMESTAMP,
+    time_limit          INT       NOT NULL DEFAULT 30,
+    created_at          TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+    updated_at          TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+    FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER update_game_sessions_timestamp
+    BEFORE INSERT OR UPDATE ON game_sessions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
+-- ===============================
+-- 16. Bảng game_questions
+-- ===============================
+CREATE TABLE game_questions
+(
+    game_session_id INT NOT NULL,
+    question_id     INT NOT NULL,
+    question_order  INT NOT NULL,
+    time_limit      INT NOT NULL DEFAULT 30,
+    created_at      TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+    updated_at      TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+    PRIMARY KEY (game_session_id, question_id),
+    FOREIGN KEY (game_session_id) REFERENCES game_sessions (id) ON DELETE CASCADE,
+    FOREIGN KEY (question_id) REFERENCES questions (id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER update_game_questions_timestamp
+    BEFORE INSERT OR UPDATE ON game_questions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
+-- ===============================
+-- 17. Bảng socket_connections
+-- ===============================
+CREATE TABLE socket_connections
+(
+    id           SERIAL PRIMARY KEY,
+    socket_id    TEXT      NOT NULL UNIQUE,
+    user_id      INT,
+    room_id      INT,
+    connected_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+    last_activity TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER update_socket_connections_timestamp
+    BEFORE INSERT OR UPDATE ON socket_connections
     FOR EACH ROW
     EXECUTE FUNCTION update_timestamp();

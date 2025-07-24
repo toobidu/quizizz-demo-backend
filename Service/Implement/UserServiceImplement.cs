@@ -22,7 +22,7 @@ namespace ConsoleApp1.Service.Implement
         public async Task<bool> CreateUserAsync(UserDTO userDto)
         {
             var userEntity = UserMapper.ToEntity(userDto);
-            var userId = await _userRepository.AddAsync(userEntity);
+            var userId = await _userRepository.CreateUserAsync(userEntity);
             var roleId = await MapTypeAccountToRoleIdAsync(userDto.TypeAccount);
             if (roleId == 0) return false;
             var userRole = new UserRole(userId, roleId, DateTime.UtcNow, DateTime.UtcNow);
@@ -31,23 +31,23 @@ namespace ConsoleApp1.Service.Implement
         }
         public async Task<List<UserDTO>> GetAllUsersAsync()
         {
-            var users = await _userRepository.GetAllAsync();
+            var users = await _userRepository.GetAllUsersAsync(1, 100);
             return users.Select(UserMapper.ToDTO).ToList();
         }
         public async Task<UserDTO?> GetUserByIdAsync(int userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetUserByIdAsync(userId);
             return user != null ? UserMapper.ToDTO(user) : null;
         }
         public async Task<bool> UpdateUserAsync(int userId, UserDTO updatedUser)
         {
-            var existingUser = await _userRepository.GetByIdAsync(userId);
+            var existingUser = await _userRepository.GetUserByIdAsync(userId);
             if (existingUser == null) return false;
             var updatedEntity = new User(updatedUser.Username, updatedUser.FullName, updatedUser.Email, updatedUser.PhoneNumber, updatedUser.Address, updatedUser.Password, updatedUser.TypeAccount, DateTime.UtcNow, DateTime.UtcNow )
             {
                 Id = userId
             };
-            await _userRepository.UpdateAsync(updatedEntity);
+            await _userRepository.UpdateUserAsync(updatedEntity);
             var newRoleId = await MapTypeAccountToRoleIdAsync(updatedUser.TypeAccount);
             var currentRoles = await _userRoleRepository.GetByUserIdAsync(userId);
             var currentRole = currentRoles.FirstOrDefault();
@@ -60,14 +60,14 @@ namespace ConsoleApp1.Service.Implement
         }
         public async Task<bool> DeleteUserAsync(int userId)
         {
-            return await _userRepository.DeleteAsync(userId);
+            return await _userRepository.DeleteUserAsync(userId);
         }
         public async Task<bool> UpdateUserTypeAccountAsync(int userId, string newTypeAccount)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetUserByIdAsync(userId);
             if (user == null) return false;
             user.TypeAccount = newTypeAccount;
-            await _userRepository.UpdateAsync(user);
+            await _userRepository.UpdateUserAsync(user);
             var roleId = await MapTypeAccountToRoleIdAsync(newTypeAccount);
             if (roleId == 0) return false;
             await _userRoleRepository.DeleteByUserIdAsync(userId);
@@ -76,7 +76,7 @@ namespace ConsoleApp1.Service.Implement
         }
         public async Task<string?> GetTypeAccountAsync(int userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetUserByIdAsync(userId);
             return user?.TypeAccount;
         }
         public async Task<int> MapTypeAccountToRoleIdAsync(string typeAccount)

@@ -9,6 +9,6 @@ public class GameQuestion
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     // Navigation properties
-    public GameSession GameSession { get; set; }
-    public Question Question { get; set; }
+    public GameSession? GameSession { get; set; }
+    public Question? Question { get; set; }
 }

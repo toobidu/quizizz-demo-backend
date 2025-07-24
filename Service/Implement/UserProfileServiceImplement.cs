@@ -3,7 +3,6 @@ using ConsoleApp1.Model.Entity.Questions;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
-using BCrypt.Net;
 namespace ConsoleApp1.Service.Implement;
 public class UserProfileServiceImplement : IUserProfileService
 {
@@ -24,7 +23,7 @@ public class UserProfileServiceImplement : IUserProfileService
     }
     public async Task<UserProfileDTO?> GetUserProfileAsync(int userId)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdAsync(userId);
         if (user == null) return null;
         var stats = await GetUserStatsAsync(userId);
         return new UserProfileDTO(
@@ -34,7 +33,7 @@ public class UserProfileServiceImplement : IUserProfileService
     }
     public async Task<UserProfileDTO?> SearchUserByUsernameAsync(string username)
     {
-        var user = await _userRepository.GetByUsernameAsync(username);
+        var user = await _userRepository.GetUserByUsernameAsync(username);
         if (user == null) return null;
         var stats = await GetUserStatsAsync(user.Id);
         return new UserProfileDTO(
@@ -45,17 +44,17 @@ public class UserProfileServiceImplement : IUserProfileService
     public async Task<bool> ChangePasswordAsync(int userId, ChangePasswordRequest request)
     {
         if (!request.IsValid()) return false;
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdAsync(userId);
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.Password))
             return false;
         user.Password = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateUserAsync(user);
         return true;
     }
     public async Task<bool> UpdateProfileAsync(int userId, UpdateProfileRequest request)
     {
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetUserByIdAsync(userId);
         if (user == null) 
         {
             return false;
@@ -73,12 +72,13 @@ public class UserProfileServiceImplement : IUserProfileService
         user.PhoneNumber = request.PhoneNumber ?? user.PhoneNumber;
         user.Address = request.Address ?? user.Address;
         user.UpdatedAt = DateTime.UtcNow;
-        await _userRepository.UpdateAsync(user);
+        await _userRepository.UpdateUserAsync(user);
         return true;
     }
     private async Task<UserStats> GetUserStatsAsync(int userId)
     {
-        var userAnswers = await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 100); // Lấy nhiều hơn để tính toán chính xác
+        // Lấy danh sách câu trả lời của người dùng
+        var userAnswers = await _userAnswerRepository.GetByUserIdAsync(userId) ?? new List<UserAnswer>();
         var highestRank = await GetHighestRankAsync(userId);
         var fastestTime = userAnswers.Any() ? userAnswers.Min(ua => ua.TimeTaken) : TimeSpan.Zero;
         var highestScore = await GetHighestScoreAsync(userId, userAnswers);
@@ -87,12 +87,11 @@ public class UserProfileServiceImplement : IUserProfileService
     }
     private async Task<int> GetHighestRankAsync(int userId)
     {
-        var rank = await _rankRepository.GetByUserIdAsync(userId);
+        var rank = await _rankRepository.GetRankByUserIdAsync(userId);
         return rank?.TotalScore ?? 0;
     }
-    private async Task<int> GetHighestScoreAsync(int userId, IEnumerable<UserAnswer>? userAnswers = null)
+    private async Task<int> GetHighestScoreAsync(int userId, IEnumerable<UserAnswer> userAnswers)
     {
-        userAnswers ??= await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 100);
         if (!userAnswers.Any()) return 0;
         // Tính điểm cao nhất dựa trên room session
         var roomSessions = userAnswers.GroupBy(ua => ua.RoomId)
@@ -101,9 +100,8 @@ public class UserProfileServiceImplement : IUserProfileService
             .DefaultIfEmpty(0);
         return roomSessions.Max();
     }
-    private async Task<string> GetBestTopicAsync(int userId, IEnumerable<UserAnswer>? userAnswers = null)
+    private async Task<string> GetBestTopicAsync(int userId, IEnumerable<UserAnswer> userAnswers)
     {
-        userAnswers ??= await _userAnswerRepository.GetRecentAnswersByUserIdAsync(userId, 100);
         if (!userAnswers.Any()) return "None";
         var topicStats = userAnswers
             .Where(ua => ua.Question?.TopicId != null)

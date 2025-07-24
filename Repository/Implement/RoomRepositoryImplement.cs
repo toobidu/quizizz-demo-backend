@@ -1,162 +1,181 @@
-using System.Data;
-using ConsoleApp1.Model.Entity;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
-using Npgsql;
+
 namespace ConsoleApp1.Repository.Implement;
+
 public class RoomRepositoryImplement : IRoomRepository
 {
-    public readonly string ConnectionString;
-    public RoomRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+
+    public RoomRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    
+    // Các phương thức tương thích cũ
     public async Task<Room?> GetByIdAsync(int id)
     {
-        const string query = @"SELECT * FROM rooms WHERE id = @Id";
-        using var conn = CreateConnection();
-        return await conn.QuerySingleOrDefaultAsync<Room>(query, new { Id = id });
+        return await GetRoomByIdAsync(id);
     }
+    
     public async Task<Room?> GetByCodeAsync(string code)
     {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return null;
-        }
-        const string query = @"SELECT * FROM rooms WHERE room_code = @Code";
-        using var conn = CreateConnection();
-        var result = await conn.QuerySingleOrDefaultAsync<Room>(query, new { Code = code });
-        return result;
+        return await GetRoomByCodeAsync(code);
     }
+    
     public async Task<int> AddAsync(Room room)
     {
-        room.CreatedAt = DateTime.UtcNow;
-        room.UpdatedAt = DateTime.UtcNow;
-        const string query = @"INSERT INTO rooms (room_code, room_name, is_private, owner_id, status, max_players, created_at, updated_at) 
-                               VALUES (@RoomCode, @RoomName, @IsPrivate, @OwnerId, @Status, @MaxPlayers, @CreatedAt, @UpdatedAt) 
-                               RETURNING id";
-        using var conn = CreateConnection();
-        return await conn.ExecuteScalarAsync<int>(query, room);
+        return await CreateRoomAsync(room);
     }
-    public async Task UpdateAsync(Room room)
+    
+    public async Task<bool> UpdateAsync(Room room)
     {
-        room.UpdatedAt = DateTime.UtcNow;
-        const string query = @"UPDATE rooms SET room_name = @RoomName, is_private = @IsPrivate, 
-                               owner_id = @OwnerId, status = @Status, max_players = @MaxPlayers,
-                               updated_at = @UpdatedAt
-                               WHERE id = @Id";
-        using var conn = CreateConnection();
-        await conn.ExecuteAsync(query, room);
+        return await UpdateRoomAsync(room);
     }
+    
     public async Task<bool> DeleteAsync(int id)
     {
-        const string query = @"DELETE FROM rooms WHERE id = @Id";
-        using var conn = CreateConnection();
-        var affected = await conn.ExecuteAsync(query, new { Id = id });
-        return affected > 0;
+        return await DeleteRoomAsync(id);
     }
-    public async Task<IEnumerable<Room>> GetAllAsync()
+    
+    public async Task<bool> ExistsByCodeAsync(string code)
     {
-        const string query = @"SELECT * FROM rooms";
-        using var conn = CreateConnection();
-        var result = await conn.QueryAsync<Room>(query);
-        return result.ToList();
+        const string sql = "SELECT EXISTS (SELECT 1 FROM rooms WHERE room_code = @Code)";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.ExecuteScalarAsync<bool>(sql, new { Code = code });
     }
-    public async Task<Room> UpdateStatusAsync(int roomId, string status)
-    {
-        const string query = @"UPDATE rooms 
-            SET status = @Status, updated_at = @UpdatedAt 
-            WHERE id = @Id
-            RETURNING *";
-        using var conn = CreateConnection();
-        return await conn.QuerySingleAsync<Room>(query, 
-            new { Id = roomId, Status = status, UpdatedAt = DateTime.UtcNow });
-    }
-    public async Task<IEnumerable<Room>> GetActiveRoomsAsync()
-    {
-        const string query = @"SELECT * FROM rooms WHERE status = 'ACTIVE'";
-        using var conn = CreateConnection();
-        return await conn.QueryAsync<Room>(query);
-    }
+    
     public async Task<int> GetPlayerCountAsync(int roomId)
     {
-        const string query = @"SELECT COUNT(*) FROM room_players WHERE room_id = @RoomId";
-        using var conn = CreateConnection();
-        var count = await conn.ExecuteScalarAsync<int>(query, new { RoomId = roomId });
-        return count;
+        const string sql = "SELECT COUNT(*) FROM room_players WHERE room_id = @RoomId";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.ExecuteScalarAsync<int>(sql, new { RoomId = roomId });
     }
-    public async Task UpdateMaxPlayersAsync(int roomId, int maxPlayers)
+    
+    public async Task<bool> UpdateStatusAsync(int roomId, string status)
     {
-        const string query = @"
-        UPDATE rooms 
-        SET max_players = @MaxPlayers
-        WHERE id = @Id";
-        using var conn = CreateConnection();
-        await conn.ExecuteAsync(query, new { Id = roomId, MaxPlayers = maxPlayers });
+        const string sql = "UPDATE rooms SET status = @Status, updated_at = CURRENT_TIMESTAMP WHERE id = @RoomId";
+        using var connection = _dbHelper.GetConnection();
+        var rowsAffected = await connection.ExecuteAsync(sql, new { RoomId = roomId, Status = status });
+        return rowsAffected > 0;
     }
-    public async Task<IEnumerable<Room>> GetPublicWaitingRoomsAsync()
+    
+    public async Task<bool> UpdateMaxPlayersAsync(int roomId, int maxPlayers)
     {
-        const string query = @"SELECT * FROM rooms WHERE is_private = false AND status = 'waiting'";
-        using var conn = CreateConnection();
-        return await conn.QueryAsync<Room>(query);
+        const string sql = "UPDATE rooms SET max_players = @MaxPlayers, updated_at = CURRENT_TIMESTAMP WHERE id = @RoomId";
+        using var connection = _dbHelper.GetConnection();
+        var rowsAffected = await connection.ExecuteAsync(sql, new { RoomId = roomId, MaxPlayers = maxPlayers });
+        return rowsAffected > 0;
     }
-    public async Task<bool> ExistsByCodeAsync(string roomCode)
+    
+    public async Task<string> GetRoomTopicNameAsync(int roomId)
     {
-        const string query = @"SELECT COUNT(*) FROM rooms WHERE room_code = @RoomCode";
-        using var conn = CreateConnection();
-        var count = await conn.ExecuteScalarAsync<int>(query, new { RoomCode = roomCode });
-        return count > 0;
+        const string sql = @"
+            SELECT t.name 
+            FROM topics t 
+            JOIN room_settings rs ON rs.setting_value = t.id::text 
+            WHERE rs.room_id = @RoomId AND rs.setting_key = 'topic_id'";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.ExecuteScalarAsync<string>(sql, new { RoomId = roomId }) ?? "Unknown";
     }
-    public async Task<IEnumerable<Room>> GetAllRoomsWithDetailsAsync()
-    {
-        const string query = @"SELECT 
-            r.id as Id,
-            r.room_code as RoomCode,
-            r.room_name as RoomName,
-            r.is_private as IsPrivate,
-            r.owner_id as OwnerId,
-            r.status as Status,
-            r.max_players as MaxPlayers,
-            r.created_at as CreatedAt,
-            r.updated_at as UpdatedAt
-            FROM rooms r ORDER BY r.created_at DESC";
-        using var conn = CreateConnection();
-        return await conn.QueryAsync<Room>(query);
-    }
-    public async Task<string?> GetRoomTopicNameAsync(int roomId)
-    {
-        const string query = @"
-            SELECT COALESCE(t.name, 'Ki?n th?c chung') 
-            FROM room_settings rs 
-            LEFT JOIN topics t ON t.id = CAST(rs.setting_value AS INTEGER)
-            WHERE rs.room_id = @RoomId AND rs.setting_key = 'topic_id'
-            LIMIT 1";
-        using var conn = CreateConnection();
-        var result = await conn.QuerySingleOrDefaultAsync<string>(query, new { RoomId = roomId });
-        return result ?? "Ki?n th?c chung";
-    }
+    
     public async Task<int> GetRoomQuestionCountAsync(int roomId)
     {
-        const string query = @"
-            SELECT COALESCE(CAST(rs.setting_value AS INTEGER), 10) 
-            FROM room_settings rs 
-            WHERE rs.room_id = @RoomId AND rs.setting_key = 'question_count'
-            LIMIT 1";
-        using var conn = CreateConnection();
-        var result = await conn.QuerySingleOrDefaultAsync<int?>(query, new { RoomId = roomId });
-        return result ?? 10;
+        const string sql = @"
+            SELECT COUNT(*) 
+            FROM game_questions gq 
+            JOIN game_sessions gs ON gq.game_session_id = gs.id 
+            WHERE gs.room_id = @RoomId";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.ExecuteScalarAsync<int>(sql, new { RoomId = roomId });
     }
+    
     public async Task<int> GetRoomCountdownTimeAsync(int roomId)
     {
-        const string query = @"
-            SELECT COALESCE(CAST(rs.setting_value AS INTEGER), 300) 
-            FROM room_settings rs 
-            WHERE rs.room_id = @RoomId AND rs.setting_key = 'countdown_seconds'
-            LIMIT 1";
-        using var conn = CreateConnection();
-        var result = await conn.QuerySingleOrDefaultAsync<int?>(query, new { RoomId = roomId });
-        return result ?? 300;
+        const string sql = @"
+            SELECT COALESCE(
+                (SELECT setting_value::int FROM room_settings 
+                WHERE room_id = @RoomId AND setting_key = 'countdown_time'), 
+                30)";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.ExecuteScalarAsync<int>(sql, new { RoomId = roomId });
+    }
+    
+    public async Task<List<Room>> GetPublicWaitingRoomsAsync()
+    {
+        const string sql = "SELECT * FROM rooms WHERE is_private = false AND status = 'waiting'";
+        using var connection = _dbHelper.GetConnection();
+        var rooms = await connection.QueryAsync<Room>(sql);
+        return rooms.ToList();
+    }
+    
+    public async Task<List<Room>> GetAllRoomsWithDetailsAsync()
+    {
+        const string sql = @"
+            SELECT r.*, u.username as OwnerUsername 
+            FROM rooms r 
+            JOIN users u ON r.owner_id = u.id";
+        using var connection = _dbHelper.GetConnection();
+        var rooms = await connection.QueryAsync<Room>(sql);
+        return rooms.ToList();
+    }
+
+    public async Task<Room?> GetRoomByIdAsync(int roomId)
+    {
+        const string sql = "SELECT * FROM rooms WHERE id = @RoomId";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.QueryFirstOrDefaultAsync<Room>(sql, new { RoomId = roomId });
+    }
+
+    public async Task<Room?> GetRoomByCodeAsync(string roomCode)
+    {
+        const string sql = "SELECT * FROM rooms WHERE room_code = @RoomCode";
+        using var connection = _dbHelper.GetConnection();
+        return await connection.QueryFirstOrDefaultAsync<Room>(sql, new { RoomCode = roomCode });
+    }
+
+    public async Task<List<Room>> GetRoomsByOwnerIdAsync(int ownerId)
+    {
+        const string sql = "SELECT * FROM rooms WHERE owner_id = @OwnerId";
+        using var connection = _dbHelper.GetConnection();
+        var rooms = await connection.QueryAsync<Room>(sql, new { OwnerId = ownerId });
+        return rooms.ToList();
+    }
+
+    public async Task<int> CreateRoomAsync(Room room)
+    {
+        const string sql = @"
+            INSERT INTO rooms (room_code, room_name, is_private, owner_id, status, max_players)
+            VALUES (@RoomCode, @RoomName, @IsPrivate, @OwnerId, @Status, @MaxPlayers)
+            RETURNING id";
+        
+        using var connection = _dbHelper.GetConnection();
+        return await connection.ExecuteScalarAsync<int>(sql, room);
+    }
+
+    public async Task<bool> UpdateRoomAsync(Room room)
+    {
+        const string sql = @"
+            UPDATE rooms
+            SET room_name = @RoomName,
+                is_private = @IsPrivate,
+                status = @Status,
+                max_players = @MaxPlayers,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = @Id";
+        
+        using var connection = _dbHelper.GetConnection();
+        var rowsAffected = await connection.ExecuteAsync(sql, room);
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> DeleteRoomAsync(int roomId)
+    {
+        const string sql = "DELETE FROM rooms WHERE id = @RoomId";
+        using var connection = _dbHelper.GetConnection();
+        var rowsAffected = await connection.ExecuteAsync(sql, new { RoomId = roomId });
+        return rowsAffected > 0;
     }
 }

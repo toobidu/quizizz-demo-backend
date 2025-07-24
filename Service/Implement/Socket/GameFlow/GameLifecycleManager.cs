@@ -29,7 +29,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Bắt đầu game đơn giản (không có câu hỏi)
     /// </summary>
-    public async Task BatDauGameDonGianAsync(string maPhong)
+    public async Task StartSimpleGameAsync(string maPhong)
     {
         try
         {
@@ -66,12 +66,12 @@ public class GameLifecycleManager
     /// <summary>
     /// Bắt đầu game với danh sách câu hỏi và thời gian giới hạn
     /// </summary>
-    public async Task BatDauGameVoiCauHoiAsync(string maPhong, object cauHoi, int thoiGianGioiHan)
+    public async Task StartGameWithQuestionsAsync(string maPhong, object cauHoi, int thoiGianGioiHan)
     {
         try
         {
             // Kiểm tra thời gian giới hạn hợp lệ
-            if (!KiemTraThoiGianGioiHanHopLe(thoiGianGioiHan))
+            if (!IsValidTimeLimit(thoiGianGioiHan))
             {
                 return;
             }
@@ -90,11 +90,11 @@ public class GameLifecycleManager
                 _sessionManager.InitializePlayerProgress(maPhong, gameRoom.Players);
             }
             // Gửi countdown 3-2-1 trước khi bắt đầu
-            await GuiDemNguocAsync(maPhong, GameFlowConstants.Defaults.CountdownSeconds);
+            await SendCountdownAsync(maPhong, GameFlowConstants.Defaults.CountdownSeconds);
             // Khởi tạo timer cho game (tự động kết thúc khi hết thời gian)
             _timerManager.CreateGameTimer(maPhong, thoiGianGioiHan, async () =>
             {
-                await KetThucGameDoHetThoiGianAsync(maPhong);
+                await EndGameDueToTimeoutAsync(maPhong);
             });
         }
         catch (Exception ex)
@@ -104,7 +104,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Gửi đếm ngược trước khi bắt đầu game
     /// </summary>
-    public async Task GuiDemNguocAsync(string maPhong, int demNguoc)
+    public async Task SendCountdownAsync(string maPhong, int demNguoc)
     {
         try
         {
@@ -142,7 +142,7 @@ public class GameLifecycleManager
                             Question = gameSession.Questions[0],
                             QuestionIndex = 0,
                             TotalQuestions = gameSession.Questions.Count,
-                            TimeRemaining = LayThoiGianConLaiCuaGame(gameSession),
+                            TimeRemaining = GetRemainingGameTime(gameSession),
                             GameState = GameFlowConstants.GameStates.QuestionActive
                         };
                         await _eventBroadcaster.BroadcastNewQuestionAsync(maPhong, duLieuCauHoi);
@@ -156,7 +156,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Cập nhật trạng thái game
     /// </summary>
-    public async Task CapNhatTrangThaiGameAsync(string maPhong, string trangThai)
+    public async Task UpdateGameStateAsync(string maPhong, string trangThai)
     {
         try
         {
@@ -185,7 +185,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Kết thúc game thủ công (do host)
     /// </summary>
-    public async Task KetThucGameThucCongAsync(string maPhong, string lyDo = "Host kết thúc game")
+    public async Task EndGameManuallyAsync(string maPhong, string lyDo = "Host kết thúc game")
     {
         try
         {
@@ -212,7 +212,7 @@ public class GameLifecycleManager
             await _eventBroadcaster.BroadcastGameEndedAsync(maPhong, duLieuSuKien);
             // Dọn dẹp sau delay
             _ = Task.Delay(TimeSpan.FromSeconds(GameFlowConstants.Defaults.CleanupDelaySeconds))
-                .ContinueWith(async _ => await DonDepGameSessionAsync(maPhong));
+                .ContinueWith(async _ => await CleanupGameSessionAsync(maPhong));
         }
         catch (Exception ex)
         {
@@ -221,7 +221,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Dọn dẹp game session khi kết thúc
     /// </summary>
-    public async Task DonDepGameSessionAsync(string maPhong)
+    public async Task CleanupGameSessionAsync(string maPhong)
     {
         try
         {
@@ -243,11 +243,11 @@ public class GameLifecycleManager
     /// <summary>
     /// Tạm dừng game
     /// </summary>
-    public async Task TamDungGameAsync(string maPhong)
+    public async Task PauseGameAsync(string maPhong)
     {
         try
         {
-            await CapNhatTrangThaiGameAsync(maPhong, "paused");
+            await UpdateGameStateAsync(maPhong, "paused");
             // Dừng tất cả timer tạm thời
             _timerManager.DisposeAllTimersForRoom(maPhong);
             // Broadcast thông báo tạm dừng
@@ -260,20 +260,20 @@ public class GameLifecycleManager
     /// <summary>
     /// Tiếp tục game sau khi tạm dừng
     /// </summary>
-    public async Task TiepTucGameAsync(string maPhong)
+    public async Task ResumeGameAsync(string maPhong)
     {
         try
         {
             var gameSession = _sessionManager.GetGameSession(maPhong);
             if (gameSession == null) return;
-            await CapNhatTrangThaiGameAsync(maPhong, GameFlowConstants.GameStates.Playing);
+            await UpdateGameStateAsync(maPhong, GameFlowConstants.GameStates.Playing);
             // Tính thời gian còn lại và tạo lại timer
-            var thoiGianConLai = LayThoiGianConLaiCuaGame(gameSession);
+            var thoiGianConLai = GetRemainingGameTime(gameSession);
             if (thoiGianConLai > 0)
             {
                 _timerManager.CreateGameTimer(maPhong, thoiGianConLai, async () =>
                 {
-                    await KetThucGameDoHetThoiGianAsync(maPhong);
+                    await EndGameDueToTimeoutAsync(maPhong);
                 });
             }
             // Broadcast thông báo tiếp tục
@@ -287,7 +287,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Kiểm tra thời gian giới hạn có hợp lệ không
     /// </summary>
-    private bool KiemTraThoiGianGioiHanHopLe(int thoiGianGioiHan)
+    private bool IsValidTimeLimit(int thoiGianGioiHan)
     {
         return thoiGianGioiHan >= GameFlowConstants.Limits.MinGameTimeLimit && 
                thoiGianGioiHan <= GameFlowConstants.Limits.MaxGameTimeLimit;
@@ -295,7 +295,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Tính thời gian còn lại của game (giây)
     /// </summary>
-    private int LayThoiGianConLaiCuaGame(GameSession gameSession)
+    private int GetRemainingGameTime(GameSession gameSession)
     {
         if (!gameSession.IsGameActive) return 0;
         var thoiGianDaTroi = (DateTime.UtcNow - gameSession.GameStartTime).TotalSeconds;
@@ -305,7 +305,7 @@ public class GameLifecycleManager
     /// <summary>
     /// Kết thúc game do hết thời gian
     /// </summary>
-    private async Task KetThucGameDoHetThoiGianAsync(string maPhong)
+    private async Task EndGameDueToTimeoutAsync(string maPhong)
     {
         try
         {
@@ -329,7 +329,7 @@ public class GameLifecycleManager
             await _eventBroadcaster.BroadcastGameEndedAsync(maPhong, duLieuSuKien);
             // Dọn dẹp sau delay
             _ = Task.Delay(TimeSpan.FromSeconds(GameFlowConstants.Defaults.CleanupDelaySeconds))
-                .ContinueWith(async _ => await DonDepGameSessionAsync(maPhong));
+                .ContinueWith(async _ => await CleanupGameSessionAsync(maPhong));
         }
         catch (Exception ex)
         {

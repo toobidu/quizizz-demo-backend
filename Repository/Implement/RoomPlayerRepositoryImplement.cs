@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
@@ -6,12 +7,12 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
 {
-    public readonly string ConnectionString;
-    public RoomPlayerRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public RoomPlayerRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<RoomPlayer?> GetByUserIdAndRoomIdAsync(int userId, int roomId)
     {
         const string query = @"SELECT * FROM room_players 
@@ -41,7 +42,7 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
     }
     public async Task<int> AddAsync(RoomPlayer roomPlayer)
     {
-        // Ki?m tra duplicate tru?c khi thêm
+        // Ki?m tra duplicate tru?c khi thï¿½m
         var existing = await GetByUserIdAndRoomIdAsync(roomPlayer.UserId, roomPlayer.RoomId);
         if (existing != null)
         {
@@ -67,14 +68,14 @@ public class RoomPlayerRepositoryImplement : IRoomPlayerRepository
     }
     public async Task<bool> DeleteByUserIdAndRoomIdAsync(int userId, int roomId)
     {
-        // Ki?m tra tru?c khi xóa
+        // Ki?m tra tru?c khi xï¿½a
         const string checkQuery = @"SELECT COUNT(*) FROM room_players WHERE user_id = @UserId AND room_id = @RoomId";
         using var conn = CreateConnection();
         var existsBefore = await conn.ExecuteScalarAsync<int>(checkQuery, new { UserId = userId, RoomId = roomId });
         const string query = @"DELETE FROM room_players 
                                WHERE user_id = @UserId AND room_id = @RoomId";
         var affected = await conn.ExecuteAsync(query, new { UserId = userId, RoomId = roomId });
-        // Ki?m tra sau khi xóa
+        // Ki?m tra sau khi xï¿½a
         var existsAfter = await conn.ExecuteScalarAsync<int>(checkQuery, new { UserId = userId, RoomId = roomId });
         return affected > 0;
     }

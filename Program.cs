@@ -14,50 +14,57 @@ using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
+using SocketConnectionService = ConsoleApp1.Service.Implement.Socket.SocketConnectionServiceImplement;
+
 internal class Program
 {
     private static async Task Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
         var config = ConfigLoader.Load();
-        // Kh?i t?o Redis v� JWT helper
+
+        // Initialize Redis and JWT helper
         var redisConn = new RedisConnection(config.Redis);
         var redisService = new RedisServiceImplement(redisConn);
         var jwtHelper = new JwtHelper(config.Security);
-        // Kh?i t?o Repository (d? li?u t? PostgreSQL)
+
+        // Initialize Repositories
         string dbConnection = config.ConnectionStrings["DefaultConnection"];
-        IUserRepository userRepo = new UserRepositoryImplement(dbConnection);
-        IRoleRepository roleRepo = new RoleRepositoryImplement(dbConnection);
-        IUserRoleRepository userRoleRepo = new UserRoleRepositoryImplement(dbConnection);
-        IRolePermissionRepository rolePermissionRepo = new RolePermissionRepositoryImplement(dbConnection);
-        IPermissionRepository permissionRepo = new PermissionRepositoryImplement(dbConnection);
-        IUserAnswerRepository userAnswerRepo = new UserAnswerRepositoryImplement(dbConnection);
-        IAnswerRepository answerRepo = new AnswerRepositoryImplement(dbConnection);
-        IRankRepository rankRepo = new RankRepositoryImplement(dbConnection);
-        ITopicRepository topicRepo = new TopicRepositoryImplement(dbConnection);
-        IQuestionRepository questionRepo = new QuestionRepositoryImplement(dbConnection);
-        
-        // Kh?i t?o Repository cho Room
-        IRoomRepository roomRepo = new RoomRepositoryImplement(dbConnection);
-        IRoomPlayerRepository roomPlayerRepo = new RoomPlayerRepositoryImplement(dbConnection);
-        IRoomSettingsRepository roomSettingsRepo = new RoomSettingsRepositoryImplement(dbConnection);
-        // Kh?i t?o Repository cho c�c b?ng m?i
         var databaseHelper = new DatabaseHelper(dbConnection);
+        IUserRepository userRepo = new UserRepositoryImplement(databaseHelper);
+        IRoleRepository roleRepo = new RoleRepositoryImplement(databaseHelper);
+        IUserRoleRepository userRoleRepo = new UserRoleRepositoryImplement(databaseHelper);
+        IRolePermissionRepository rolePermissionRepo = new RolePermissionRepositoryImplement(databaseHelper);
+        IPermissionRepository permissionRepo = new PermissionRepositoryImplement(databaseHelper);
+        IUserAnswerRepository userAnswerRepo = new UserAnswerRepositoryImplement(databaseHelper);
+        IAnswerRepository answerRepo = new AnswerRepositoryImplement(databaseHelper);
+        IRankRepository rankRepo = new RankRepositoryImplement(databaseHelper);
+        ITopicRepository topicRepo = new TopicRepositoryImplement(databaseHelper);
+        IQuestionRepository questionRepo = new QuestionRepositoryImplement(databaseHelper);
+
+        // Initialize Room Repositories
+        IRoomRepository roomRepo = new RoomRepositoryImplement(databaseHelper);
+        IRoomPlayerRepository roomPlayerRepo = new RoomPlayerRepositoryImplement(databaseHelper);
+        IRoomSettingsRepository roomSettingsRepo = new RoomSettingsRepositoryImplement(databaseHelper);
+
+        // Initialize new Repositories
         IGameSessionRepository gameSessionRepo = new GameSessionRepositoryImplement(databaseHelper);
         IGameQuestionRepository gameQuestionRepo = new GameQuestionRepositoryImplement(databaseHelper);
         ISocketConnectionRepository socketConnectionRepo = new SocketConnectionRepositoryImplement(databaseHelper);
-        // Kh?i t?o EmailConfig v� EmailService
+
+        // Initialize EmailConfig and EmailService
         var emailConfig = new EmailConfig
         {
-            FromEmail = "dungto0300567@gmail.com", // Email th?t
-            FromPassword = "your-app-password", // C?n App Password t? Google
+            FromEmail = "dungto0300567@gmail.com",
+            FromPassword = "your-app-password",
             FromName = "Quizizz App",
             SmtpHost = "smtp.gmail.com",
             SmtpPort = 587,
             EnableSsl = true
         };
         IEmailService emailService = new EmailServiceImplement(emailConfig);
-        // Kh?i t?o Service
+
+        // Initialize Services
         IAuthService authService = new AuthServiceImplement(
             userRepo, permissionRepo, roleRepo, userRoleRepo, redisService, emailService, jwtHelper,
             config.Security
@@ -70,23 +77,28 @@ internal class Program
         IPermissionService permissionService = new PermissionServiceImplement(permissionRepo);
         IUserService userService = new UserServiceImplement(userRepo, userRoleRepo, roleRepo);
         IUserProfileService userProfileService = new UserProfileServiceImplement(userRepo, userAnswerRepo, rankRepo, topicRepo);
-        // Kh?i t?o Service cho c�c b?ng m?i
-        IGameSessionService gameSessionService = new GameSessionServiceImplement(gameSessionRepo, gameQuestionRepo, null);
+
+        // Initialize new Services
+        IGameSessionService gameSessionService = new GameSessionServiceImplement(gameSessionRepo, gameQuestionRepo, questionRepo);
         ISocketConnectionDbService socketConnectionDbService = new SocketConnectionDbServiceImplement(socketConnectionRepo);
-        // Kh?i t?o shared dictionaries cho WebSocket services
+
+        // Shared dictionaries for WebSocket services
         var gameRooms = new ConcurrentDictionary<string, GameRoom>();
         var webSocketConnections = new ConcurrentDictionary<string, WebSocket>();
         var socketToRoom = new ConcurrentDictionary<string, string>();
-        // Kh?i t?o c�c WebSocket service con v?i shared dictionaries
-        var socketConnectionSocketService = new ConsoleApp1.Service.Implement.Socket.SocketConnectionServiceImplement(webSocketConnections, socketToRoom);
+
+        // Initialize WebSocket services
+        var socketConnectionSocketService = new SocketConnectionService(webSocketConnections, socketToRoom);
         var roomManagementSocketService = new RoomManagementSocketServiceImplement(gameRooms, socketToRoom, webSocketConnections);
         IGameFlowSocketService gameFlowSocketService = new GameFlowSocketServiceImplement(gameRooms, webSocketConnections);
         IPlayerInteractionSocketService playerInteractionSocketService = new PlayerInteractionSocketServiceImplement(gameRooms, webSocketConnections);
         IScoringSocketService scoringSocketService = new ScoringSocketServiceImplement(gameRooms, webSocketConnections);
         IHostControlSocketService hostControlSocketService = new HostControlSocketServiceImplement(gameRooms, webSocketConnections);
-        // Thi?t l?p reference gi?a c�c service
+
+        // Set dependencies between services
         socketConnectionSocketService.SetRoomManagementService(roomManagementSocketService);
-        // Kh?i t?o composite SocketService v?i t?t c? dependency
+
+        // Initialize composite SocketService
         ISocketService socketService = new SocketServiceImplement(
             socketConnectionSocketService,
             roomManagementSocketService,
@@ -95,18 +107,21 @@ internal class Program
             scoringSocketService,
             hostControlSocketService
         );
-        // Kh?i t?o BroadcastService tru?c (kh�ng c?n joinRoomService):
+
+        // Initialize BroadcastService
         IBroadcastService broadcastService = new BroadcastServiceImplement(
-            socketService, roomRepo, roomPlayerRepo, userRepo, null!); // T?m th?i null
+            socketService, roomRepo, roomPlayerRepo, userRepo, null!);
         ICreateRoomService createRoomService = new CreateRoomServiceImplement(
             roomRepo, roomSettingsRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, broadcastService, socketService);
         IJoinRoomService joinRoomService = new JoinRoomServiceImplement(
             roomRepo, roomPlayerRepo, userRepo, userRoleRepo, roleRepo, createRoomService, socketService, broadcastService);
         IRoomManagementService roomManagementService = new RoomManagementServiceImplement(
             roomRepo, roomPlayerRepo, roomSettingsRepo, userRepo);
-        // C?p nh?t joinRoomService cho BroadcastService:
+
+        // Update joinRoomService for BroadcastService
         ((BroadcastServiceImplement)broadcastService).SetJoinRoomService(joinRoomService);
-        // Kh?i t?o Controller:
+
+        // Initialize Controllers
         var authController = new AuthController(authService, jwtHelper);
         var forgotPasswordController = new ForgotPasswordController(authService);
         var rolePermissionController = new RolePermissionController(rolePermissionService, authorizationService, jwtHelper);
@@ -115,14 +130,16 @@ internal class Program
         var userController = new UserController(userService, authorizationService, jwtHelper);
         var userProfileController = new UserProfileController(userProfileService, authorizationService);
         var createRoomController = new CreateRoomController(createRoomService, authorizationService);
-        var joinRoomController = new JoinRoomController(joinRoomService,authorizationService);
+        var joinRoomController = new JoinRoomController(joinRoomService, authorizationService);
         var leaveRoomController = new LeaveRoomController(joinRoomService, authorizationService);
         var gameController = new GameController(socketService, joinRoomService);
         var topicController = new TopicController(topicRepo);
         var questionController = new QuestionController(questionRepo, roomRepo, answerRepo);
-        var gameSessionController = new GameSessionController(gameSessionService);
-        var socketConnectionController = new SocketConnectionController(socketConnectionDbService);
-        // Kh?i t?o Router cho t?ng Controller:
+        var socketConnectionService = new ConsoleApp1.Service.Implement.SocketConnectionServiceImplement();
+        var gameSessionController = new GameSessionController(gameSessionRepo, gameQuestionRepo, roomRepo, socketConnectionService);
+        var socketConnectionController = new SocketConnectionController(socketConnectionRepo, userRepo, roomRepo, socketConnectionService);
+
+        // Initialize Routers
         var authRouter = new AuthRouter(authController);
         var forgotPasswordRouter = new ForgotPasswordRouter(forgotPasswordController);
         var rolePermissionRouter = new RolePermissionRouter(rolePermissionController);
@@ -135,13 +152,20 @@ internal class Program
         var leaveRoomRouter = new LeaveRoomRouter(leaveRoomController, jwtHelper);
         var gameRouter = new GameRouter(gameController, questionController);
         var topicRouter = new TopicRouter(topicController);
-        var gameSessionRouter = new GameSessionRouter(gameSessionController);
-        var socketConnectionRouter = new SocketConnectionRouter(socketConnectionController);
-        // Kh?i d?ng Socket.IO server
+        var questionRouter = new QuestionRouter(questionController);
+        var gameSessionRouter = new GameSessionRouter(gameSessionService);
+        var socketConnectionRouter = new SocketConnectionRouter(socketConnectionDbService);
+        var userAnswerRouter = new UserAnswerRouter();
+        var rankingRouter = new RankingRouter();
+        var healthCheckRouter = new HealthCheckRouter();
+
+        // Start Socket.IO server
         await socketService.StartAsync(3001);
-        // �ang k� t?t c? router v�o HttpServer
+
+        // Register all routers to HttpServer
         var server = new HttpServer(
             "http://localhost:5000/",
+            healthCheckRouter,
             authRouter,
             forgotPasswordRouter,
             rolePermissionRouter,
@@ -154,9 +178,27 @@ internal class Program
             leaveRoomRouter,
             gameRouter,
             topicRouter,
+            questionRouter,
             gameSessionRouter,
-            socketConnectionRouter
+            socketConnectionRouter,
+            userAnswerRouter,
+            rankingRouter
         );
+
+        // Display startup information
+        Console.WriteLine("===========================================");
+        Console.WriteLine("🎯 QUIZIZZ API SERVER STARTING...");
+        Console.WriteLine("===========================================");
+        Console.WriteLine();
+        Console.WriteLine("📡 HTTP Server: http://localhost:5000");
+        Console.WriteLine("🔌 WebSocket Server: ws://localhost:3001");
+        Console.WriteLine("🩺 Health Check: http://localhost:5000/health");
+        Console.WriteLine();
+        Console.WriteLine("🚀 Ready to accept connections!");
+        Console.WriteLine("   Press Ctrl+C to stop the server");
+        Console.WriteLine("===========================================");
+        Console.WriteLine();
+
         await server.StartAsync();
     }
 }

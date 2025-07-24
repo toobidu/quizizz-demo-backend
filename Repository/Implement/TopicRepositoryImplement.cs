@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Questions;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
@@ -6,12 +7,12 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class TopicRepositoryImplement : ITopicRepository
 {
-    private readonly string ConnectionString;
-    public TopicRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public TopicRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<Topic?> GetByIdAsync(int id)
     {
         const string query = "SELECT * FROM topics WHERE id = @Id";

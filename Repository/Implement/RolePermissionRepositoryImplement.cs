@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
@@ -6,12 +7,12 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class RolePermissionRepositoryImplement : IRolePermissionRepository
 {
-    public readonly string ConnectionString;
-    public RolePermissionRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public RolePermissionRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<RolePermission?> GetByRoleIdAndPermissionIdAsync(int roleId, int permissionId)
     {
         const string query = @"
@@ -49,7 +50,7 @@ public class RolePermissionRepositoryImplement : IRolePermissionRepository
         const string query = @"
             INSERT INTO role_permissions (role_id, permission_id)
             VALUES (@RoleId, @PermissionId)
-            RETURNING role_id"; // ho?c RETURNING permission_id n?u b?n mu?n l?y cái nào
+            RETURNING role_id"; // ho?c RETURNING permission_id n?u b?n mu?n l?y cï¿½i nï¿½o
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(query, rolePermission);
     }

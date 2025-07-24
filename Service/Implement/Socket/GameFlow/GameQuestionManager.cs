@@ -23,7 +23,7 @@ public class GameQuestionManager
     /// Gửi câu hỏi tiếp theo cho một người chơi cụ thể
     /// Dùng trong chế độ self-paced (mỗi người chơi với tốc độ riêng)
     /// </summary>
-    public async Task GuiCauHoiTiepTheoChoNguoiChoiAsync(string maPhong, string tenNguoiChoi)
+    public async Task SendNextQuestionToPlayerAsync(string maPhong, string tenNguoiChoi)
     {
         try
         {
@@ -46,7 +46,7 @@ public class GameQuestionManager
                     finalScore = tienDoNguoiChoi.Score
                 });
                 // Kiểm tra xem tất cả người chơi đã hoàn thành chưa
-                await KiemTraTatCaNguoiChoiHoanThanhAsync(maPhong);
+                await CheckAllPlayersFinishedAsync(maPhong);
                 return;
             }
             // Lấy câu hỏi tiếp theo
@@ -57,7 +57,7 @@ public class GameQuestionManager
                 Question = cauHoiTiepTheo,
                 QuestionIndex = tienDoNguoiChoi.CurrentQuestionIndex,
                 TotalQuestions = gameSession.Questions.Count,
-                TimeRemaining = LayThoiGianConLaiCuaGame(gameSession)
+                TimeRemaining = GetRemainingGameTime(gameSession)
             };
             // Gửi câu hỏi cho người chơi
             await _eventBroadcaster.SendNextQuestionToPlayerAsync(maPhong, tenNguoiChoi, duLieuSuKien);
@@ -75,7 +75,7 @@ public class GameQuestionManager
     /// Gửi câu hỏi đến tất cả người chơi trong phòng
     /// Dùng trong chế độ synchronized (tất cả cùng câu hỏi)
     /// </summary>
-    public async Task GuiCauHoiAsync(string maPhong, object cauHoi, int viTriCauHoi, int tongSoCauHoi)
+    public async Task SendQuestionAsync(string maPhong, object cauHoi, int viTriCauHoi, int tongSoCauHoi)
     {
         try
         {
@@ -92,7 +92,7 @@ public class GameQuestionManager
                 Question = cauHoi,
                 QuestionIndex = viTriCauHoi,
                 TotalQuestions = tongSoCauHoi,
-                TimeRemaining = LayThoiGianConLaiCuaGame(gameSession),
+                TimeRemaining = GetRemainingGameTime(gameSession),
                 GameState = GameFlowConstants.GameStates.QuestionActive
             };
             // Broadcast câu hỏi đến tất cả người chơi trong phòng
@@ -105,7 +105,7 @@ public class GameQuestionManager
     /// <summary>
     /// Parse danh sách câu hỏi từ JSON object
     /// </summary>
-    public List<QuestionData> ParseDanhSachCauHoi(object cauHoi)
+    public List<QuestionData> ParseQuestionList(object cauHoi)
     {
         try
         {
@@ -121,7 +121,7 @@ public class GameQuestionManager
     /// <summary>
     /// Kiểm tra tính hợp lệ của danh sách câu hỏi
     /// </summary>
-    public bool KiemTraTinhHopLeCauHoi(List<QuestionData> danhSachCauHoi)
+    public bool ValidateQuestions(List<QuestionData> danhSachCauHoi)
     {
         if (danhSachCauHoi.Count == 0)
         {
@@ -146,7 +146,7 @@ public class GameQuestionManager
     /// <summary>
     /// Tính thời gian còn lại của game (giây)
     /// </summary>
-    private int LayThoiGianConLaiCuaGame(GameSession gameSession)
+    private int GetRemainingGameTime(GameSession gameSession)
     {
         if (!gameSession.IsGameActive) return 0;
         var thoiGianDaTroi = (DateTime.UtcNow - gameSession.GameStartTime).TotalSeconds;
@@ -156,7 +156,7 @@ public class GameQuestionManager
     /// <summary>
     /// Kiểm tra xem tất cả người chơi đã hoàn thành chưa
     /// </summary>
-    private async Task KiemTraTatCaNguoiChoiHoanThanhAsync(string maPhong)
+    private async Task CheckAllPlayersFinishedAsync(string maPhong)
     {
         try
         {

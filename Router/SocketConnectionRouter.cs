@@ -2,15 +2,15 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using ConsoleApp1.Config;
-using ConsoleApp1.Controller;
+using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Model.Entity.Rooms;
 namespace ConsoleApp1.Router;
 public class SocketConnectionRouter : IBaseRouter
 {
-    private readonly SocketConnectionController _controller;
-    public SocketConnectionRouter(SocketConnectionController controller)
+    private readonly ISocketConnectionDbService _service;
+    public SocketConnectionRouter(ISocketConnectionDbService service)
     {
-        _controller = controller;
+        _service = service;
     }
     public async Task<bool> HandleAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
@@ -67,7 +67,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid socket connection ID", "/api/socket-connections");
             return;
         }
-        var apiResponse = await _controller.GetByIdAsync(id);
+        var socketConnection = await _service.GetByIdAsync(id);
+        var apiResponse = ApiResponse<object>.Success(socketConnection, "Lấy thông tin socket connection thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleGetBySocketId(HttpListenerRequest request, HttpListenerResponse response)
@@ -79,7 +80,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid socket ID", "/api/socket-connections/by-socket-id");
             return;
         }
-        var apiResponse = await _controller.GetBySocketIdAsync(socketId);
+        var socketConnection = await _service.GetBySocketIdAsync(socketId);
+        var apiResponse = ApiResponse<object>.Success(socketConnection, "Lấy thông tin socket connection theo socket ID thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleGetByRoomId(HttpListenerRequest request, HttpListenerResponse response)
@@ -90,7 +92,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid room ID", "/api/socket-connections/by-room");
             return;
         }
-        var apiResponse = await _controller.GetByRoomIdAsync(roomId);
+        var socketConnections = await _service.GetByRoomIdAsync(roomId);
+        var apiResponse = ApiResponse<object>.Success(socketConnections, "Lấy danh sách socket connection theo phòng thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleGetByUserId(HttpListenerRequest request, HttpListenerResponse response)
@@ -101,7 +104,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid user ID", "/api/socket-connections/by-user");
             return;
         }
-        var apiResponse = await _controller.GetByUserIdAsync(userId);
+        var socketConnections = await _service.GetByUserIdAsync(userId);
+        var apiResponse = ApiResponse<object>.Success(socketConnections, "Lấy danh sách socket connection theo người dùng thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleCreate(HttpListenerRequest request, HttpListenerResponse response)
@@ -116,7 +120,8 @@ public class SocketConnectionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid socket connection data", "/api/socket-connections");
                 return;
             }
-            var apiResponse = await _controller.CreateAsync(socketConnection);
+            var id = await _service.CreateAsync(socketConnection);
+            var apiResponse = ApiResponse<object>.Success(new { id }, "Tạo socket connection thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -136,7 +141,8 @@ public class SocketConnectionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid socket connection data", "/api/socket-connections");
                 return;
             }
-            var apiResponse = await _controller.UpdateAsync(socketConnection);
+            var result = await _service.UpdateAsync(socketConnection);
+            var apiResponse = ApiResponse<object>.Success(new { success = result }, "Cập nhật socket connection thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -152,7 +158,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid socket connection ID", "/api/socket-connections");
             return;
         }
-        var apiResponse = await _controller.DeleteAsync(id);
+        var result = await _service.DeleteAsync(id);
+        var apiResponse = ApiResponse<object>.Success(new { success = result }, "Xóa socket connection thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleDeleteBySocketId(HttpListenerRequest request, HttpListenerResponse response)
@@ -164,7 +171,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid socket ID", "/api/socket-connections/by-socket-id");
             return;
         }
-        var apiResponse = await _controller.DeleteBySocketIdAsync(socketId);
+        var result = await _service.DeleteBySocketIdAsync(socketId);
+        var apiResponse = ApiResponse<object>.Success(new { success = result }, "Xóa socket connection theo socket ID thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleUpdateLastActivity(HttpListenerRequest request, HttpListenerResponse response)
@@ -176,7 +184,8 @@ public class SocketConnectionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid socket ID", "/api/socket-connections/activity");
             return;
         }
-        var apiResponse = await _controller.UpdateLastActivityAsync(socketId);
+        var result = await _service.UpdateLastActivityAsync(socketId);
+        var apiResponse = ApiResponse<object>.Success(new { success = result }, "Cập nhật thời gian hoạt động thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
 }

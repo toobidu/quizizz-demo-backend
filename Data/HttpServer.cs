@@ -4,6 +4,8 @@ using System.Text.Json;
 using ConsoleApp1.Controller;
 using ConsoleApp1.Model.DTO;
 using ConsoleApp1.Router;
+using ConsoleApp1.Service.Implement;
+
 public class HttpServer
 {
     private readonly HttpListener _listener = new();
@@ -40,6 +42,7 @@ public class HttpServer
         }
         try
         {
+
             bool routeFound = false;
             foreach (var router in _routers)
             {

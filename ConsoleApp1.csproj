@@ -29,6 +29,10 @@
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.35.0" />
         <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="6.35.0" />
 
+        <!-- API Dependencies -->
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.2.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.5" />
+
     </ItemGroup>
 
     <ItemGroup>

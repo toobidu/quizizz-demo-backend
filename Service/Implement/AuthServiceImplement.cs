@@ -49,7 +49,8 @@ public class AuthServiceImplement : IAuthService
             {
                 return false;
             }
-            var userExists = await _userRepo.ExistsByUsernameAsync(request.Username);
+            var existingUser = await _userRepo.GetUserByUsernameAsync(request.Username);
+            var userExists = existingUser != null;
             if (userExists)
             {
                 return false;
@@ -73,7 +74,7 @@ public class AuthServiceImplement : IAuthService
             };
             userEntity.Password = hash;
             userEntity.TypeAccount = defaultTypeAccount;
-            var userId = await _userRepo.AddAsync(userEntity);
+            var userId = await _userRepo.CreateUserAsync(userEntity);
             var userRole = UserRoleMapper.ToEntity(new UserRoleDTO(userId, role.Id));
             await _userRoleRepo.AddAsync(userRole);
             return true;
@@ -89,7 +90,7 @@ public class AuthServiceImplement : IAuthService
     {
         return null;
     }
-    var user = await _userRepo.GetByUsernameAsync(request.Username);
+    var user = await _userRepo.GetUserByUsernameAsync(request.Username);
     if (user == null)
     {
         return null;
@@ -109,7 +110,7 @@ public class AuthServiceImplement : IAuthService
         {
             return null;
         }
-        //L?y danh s�ch quy?n t? userId 
+        //L?y danh s�ch quy?n t? userId 
         var permissionNames = (await _permissionRepo.GetPermissionsByUserIdAsync(user.Id)).Distinct().ToList();
         if (permissionNames.Any())
         {
@@ -140,7 +141,7 @@ public class AuthServiceImplement : IAuthService
     {
         try
         {
-            var user = await _userRepo.GetByIdAsync(userId);
+            var user = await _userRepo.GetUserByIdAsync(userId);
             if (user == null)
             {
                 return false;
@@ -164,16 +165,16 @@ public class AuthServiceImplement : IAuthService
     {
         try
         {
-            var user = await _userRepo.GetByEmailAsync(email);
+            var user = await _userRepo.GetUserByEmailAsync(email);
             if (user == null)
             {
                 return false;
             }
-            // T?o m?t kh?u t?m th?i ng?u nhi�n
+            // Tạo mật khẩu tạm thời ngẫu nhiên
             string tempPassword = Guid.NewGuid().ToString("N").Substring(0, 8);
             var hash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
             user.Password = hash;
-            await _userRepo.UpdateAsync(user);
+            await _userRepo.UpdateUserAsync(user);
             // Trong ?ng d?ng th?c t?, g?i m?t kh?u t?m th?i qua email
             return true;
         }
@@ -186,14 +187,14 @@ public class AuthServiceImplement : IAuthService
     {
         try
         {
-            var user = await _userRepo.GetByEmailAsync(email?.Trim() ?? string.Empty);
+            var user = await _userRepo.GetUserByEmailAsync(email?.Trim() ?? string.Empty);
             if (user == null)
             {
                 return false;
             }
-            // T?o m� OTP 6 k� t?
+            // T?o m� OTP 6 k� t?
             string otpCode = GenerateOtpCode();
-            // Luu OTP v�o Redis v?i th?i gian h?t h?n 5 ph�t
+            // Luu OTP v�o Redis v?i th?i gian h?t h?n 5 ph�t
             string otpKey = $"forgot_password_otp:{email?.Trim()}";
             await _redisService.SetStringAsync(otpKey, otpCode, TimeSpan.FromMinutes(5));
             // G?i OTP qua email
@@ -233,27 +234,27 @@ public class AuthServiceImplement : IAuthService
     {
         try
         {
-            // X�c th?c OTP tru?c
+            // X�c th?c OTP tru?c
             if (!await VerifyOtpAsync(email, otpCode))
             {
                 return false;
             }
-            var user = await _userRepo.GetByEmailAsync(email);
+            var user = await _userRepo.GetUserByEmailAsync(email);
             if (user == null)
             {
                 return false;
             }
-            // Ki?m tra m?t kh?u m?i kh�ng du?c gi?ng m?t kh?u cu
+            // Kiểm tra mật khẩu mới không được giống mật khẩu cũ
             bool isSamePassword = BCrypt.Net.BCrypt.Verify(newPassword, user.Password);
             if (isSamePassword)
             {
                 return false;
             }
-            // C?p nh?t m?t kh?u m?i
+            // Cập nhật mật khẩu mới
             var hash = BCrypt.Net.BCrypt.HashPassword(newPassword);
             user.Password = hash;
-            await _userRepo.UpdateAsync(user);
-            // X�a OTP sau khi s? d?ng th�nh c�ng
+            await _userRepo.UpdateUserAsync(user);
+            // X�a OTP sau khi s? d?ng th�nh c�ng
             string otpKey = $"forgot_password_otp:{email}";
             await _redisService.DeleteAsync(otpKey);
             return true;

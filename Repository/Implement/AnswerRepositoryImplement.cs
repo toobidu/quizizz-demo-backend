@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity;
 using ConsoleApp1.Model.Entity.Questions;
 using ConsoleApp1.Repository.Interface;
@@ -7,12 +8,12 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class AnswerRepositoryImplement : IAnswerRepository
 {
-    public readonly string ConnectionString;
-    public AnswerRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public AnswerRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<Answer?> GetByIdAsync(int id)
     {
         const string query = @"SELECT * FROM answers WHERE id = @Id";

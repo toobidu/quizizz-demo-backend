@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
@@ -7,12 +8,12 @@ namespace ConsoleApp1.Repository.Implement
 {
     public class UserRoleRepositoryImplement : IUserRoleRepository
     {
-        public readonly string ConnectionString;
-        public UserRoleRepositoryImplement(string connectionString)
+        private readonly DatabaseHelper _dbHelper;
+        public UserRoleRepositoryImplement(DatabaseHelper dbHelper)
         {
-            ConnectionString = connectionString;
+            _dbHelper = dbHelper;
         }
-        private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+        private IDbConnection CreateConnection() => _dbHelper.GetConnection();
         public async Task<UserRole?> GetByUserIdAndRoleIdAsync(int userId, int roleId)
         {
             const string query = @"

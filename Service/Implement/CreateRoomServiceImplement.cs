@@ -63,13 +63,15 @@ public class CreateRoomServiceImplement : ICreateRoomService
         var existingPlayer = await _roomPlayerRepository.GetByUserIdAndRoomIdAsync(userId, roomId);
         if (existingPlayer == null)
         {
-            // T? d?ng th�m owner v�o ph�ng nhu m?t player
+            // Tự động thêm owner vào phòng như một player
             var roomPlayer = new RoomPlayer
             {
                 RoomId = roomId,
                 UserId = userId,
                 Score = 0,
                 TimeTaken = TimeSpan.Zero,
+                Status = "waiting",
+                SocketId = "",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };

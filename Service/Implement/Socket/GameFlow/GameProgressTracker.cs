@@ -21,7 +21,7 @@ public class GameProgressTracker
     /// Gửi cập nhật thời gian game còn lại
     /// Được gọi định kỳ bởi timer
     /// </summary>
-    public async Task GuiCapNhatThoiGianGameAsync(string maPhong)
+    public async Task SendGameTimeUpdateAsync(string maPhong)
     {
         try
         {
@@ -30,7 +30,7 @@ public class GameProgressTracker
             {
                 return;
             }
-            var thoiGianConLai = LayThoiGianConLaiCuaGame(gameSession);
+            var thoiGianConLai = GetRemainingGameTime(gameSession);
             // Tạo dữ liệu sự kiện
             var duLieuSuKien = new TimerUpdateEventData
             {
@@ -43,7 +43,7 @@ public class GameProgressTracker
             // Nếu hết thời gian thì kết thúc game
             if (thoiGianConLai <= 0 && gameSession.IsGameActive)
             {
-                await KetThucGameDoHetThoiGianAsync(maPhong);
+                await EndGameDueToTimeoutAsync(maPhong);
             }
         }
         catch (Exception ex)
@@ -53,7 +53,7 @@ public class GameProgressTracker
     /// <summary>
     /// Lấy tiến độ của một người chơi cụ thể
     /// </summary>
-    public async Task LayTienDoNguoiChoiAsync(string maPhong, string tenNguoiChoi)
+    public async Task GetPlayerProgressAsync(string maPhong, string tenNguoiChoi)
     {
         try
         {
@@ -74,7 +74,7 @@ public class GameProgressTracker
                 Score = tienDoNguoiChoi.Score,
                 AnswersCount = tienDoNguoiChoi.Answers.Count,
                 HasFinished = tienDoNguoiChoi.HasFinished,
-                TimeRemaining = LayThoiGianConLaiCuaGame(gameSession)
+                TimeRemaining = GetRemainingGameTime(gameSession)
             };
             // Gửi thông tin tiến độ cho người chơi
             await _eventBroadcaster.SendPlayerProgressAsync(maPhong, tenNguoiChoi, duLieuSuKien);
@@ -87,7 +87,7 @@ public class GameProgressTracker
     /// Broadcast tiến độ của tất cả người chơi
     /// Để hiển thị realtime leaderboard
     /// </summary>
-    public async Task BroadcastTienDoNguoiChoiAsync(string maPhong)
+    public async Task BroadcastPlayerProgressAsync(string maPhong)
     {
         try
         {
@@ -113,7 +113,7 @@ public class GameProgressTracker
             {
                 Players = danhSachTienDo,
                 GameState = gameSession.IsGameActive ? GameFlowConstants.GameStates.Playing : GameFlowConstants.GameStates.Ended,
-                TimeRemaining = LayThoiGianConLaiCuaGame(gameSession)
+                TimeRemaining = GetRemainingGameTime(gameSession)
             };
             // Broadcast leaderboard realtime
             await _eventBroadcaster.BroadcastProgressUpdateAsync(maPhong, duLieuSuKien);
@@ -125,7 +125,7 @@ public class GameProgressTracker
     /// <summary>
     /// Cập nhật điểm số cho người chơi
     /// </summary>
-    public void CapNhatDiemSoNguoiChoi(string maPhong, string tenNguoiChoi, int diemSo)
+    public void UpdatePlayerScore(string maPhong, string tenNguoiChoi, int diemSo)
     {
         try
         {
@@ -142,7 +142,7 @@ public class GameProgressTracker
     /// <summary>
     /// Cập nhật vị trí câu hỏi hiện tại của người chơi
     /// </summary>
-    public void CapNhatViTriCauHoiNguoiChoi(string maPhong, string tenNguoiChoi, int viTriCauHoi)
+    public void UpdatePlayerQuestionPosition(string maPhong, string tenNguoiChoi, int viTriCauHoi)
     {
         try
         {
@@ -159,7 +159,7 @@ public class GameProgressTracker
     /// <summary>
     /// Lấy thống kê game hiện tại
     /// </summary>
-    public object LayThongKeGame(string maPhong)
+    public object GetGameStatistics(string maPhong)
     {
         try
         {
@@ -173,7 +173,7 @@ public class GameProgressTracker
             var diemSoTrungBinh = gameSession.PlayerProgress.Values.Any() 
                 ? gameSession.PlayerProgress.Values.Average(p => p.Score) 
                 : 0;
-            var thoiGianConLai = LayThoiGianConLaiCuaGame(gameSession);
+            var thoiGianConLai = GetRemainingGameTime(gameSession);
             return new
             {
                 tongNguoiChoi,
@@ -195,7 +195,7 @@ public class GameProgressTracker
     /// <summary>
     /// Tính thời gian còn lại của game (giây)
     /// </summary>
-    private int LayThoiGianConLaiCuaGame(GameSession gameSession)
+    private int GetRemainingGameTime(GameSession gameSession)
     {
         if (!gameSession.IsGameActive) return 0;
         var thoiGianDaTroi = (DateTime.UtcNow - gameSession.GameStartTime).TotalSeconds;
@@ -205,7 +205,7 @@ public class GameProgressTracker
     /// <summary>
     /// Kết thúc game do hết thời gian
     /// </summary>
-    private async Task KetThucGameDoHetThoiGianAsync(string maPhong)
+    private async Task EndGameDueToTimeoutAsync(string maPhong)
     {
         try
         {

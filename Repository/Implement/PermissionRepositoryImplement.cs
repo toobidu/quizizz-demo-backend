@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
@@ -6,12 +7,12 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class PermissionRepositoryImplement : IPermissionRepository
 {
-    public readonly string ConnectionString;
-    public PermissionRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public PermissionRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<Permission?> GetByIdAsync(int id)
     {
         const string query = @"SELECT * FROM permissions WHERE id = @Id";

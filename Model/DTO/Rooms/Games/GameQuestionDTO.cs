@@ -6,5 +6,5 @@ public class GameQuestionDTO
     public int QuestionId { get; set; }
     public int QuestionOrder { get; set; }
     public int TimeLimit { get; set; }
-    public QuestionDTO Question { get; set; }
+    public required QuestionDTO Question { get; set; }
 }

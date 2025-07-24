@@ -137,4 +137,128 @@ public class QuestionController
             return ApiResponse<IEnumerable<QuestionDTO>>.Fail("Server error: " + ex.Message, 500, "SERVER_ERROR");
         }
     }
+
+    /// <summary>
+    /// Lấy danh sách câu hỏi kèm theo câu trả lời theo tên chủ đề
+    /// API này trả về câu hỏi đã được nhóm với danh sách câu trả lời của từng câu hỏi
+    /// </summary>
+    /// <param name="topicName">Tên chủ đề (ví dụ: "Toán học", "Lịch sử")</param>
+    /// <returns>Danh sách câu hỏi kèm theo câu trả lời đã được nhóm</returns>
+    public async Task<ApiResponse<IEnumerable<QuestionWithAnswersDTO>>> GetQuestionsWithAnswersByTopicNameAsync(string topicName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(topicName))
+            {
+                return ApiResponse<IEnumerable<QuestionWithAnswersDTO>>.Fail(
+                    "Tên chủ đề không được để trống", 
+                    400, 
+                    "INVALID_TOPIC_NAME"
+                );
+            }
+
+            // Lấy raw data từ repository (JOIN query)
+            var rawData = await _questionRepository.GetQuestionsWithAnswersByTopicNameAsync(topicName);
+            
+            if (!rawData.Any())
+            {
+                return ApiResponse<IEnumerable<QuestionWithAnswersDTO>>.Fail(
+                    $"Không tìm thấy câu hỏi nào cho chủ đề '{topicName}'", 
+                    404, 
+                    "NO_QUESTIONS_FOUND"
+                );
+            }
+
+            // Nhóm raw data thành câu hỏi với danh sách câu trả lời
+            var groupedData = rawData
+                .GroupBy(r => new { r.QuestionId, r.QuestionText, r.TopicName })
+                .Select(g => new QuestionWithAnswersDTO
+                {
+                    TopicName = g.Key.TopicName,
+                    QuestionId = g.Key.QuestionId,
+                    QuestionText = g.Key.QuestionText,
+                    Answers = g.Select(r => new AnswerDetailDTO
+                    {
+                        AnswerId = r.AnswerId,
+                        AnswerText = r.AnswerText,
+                        IsCorrect = r.IsCorrect
+                    }).ToList()
+                })
+                .ToList();
+
+            return ApiResponse<IEnumerable<QuestionWithAnswersDTO>>.Success(
+                groupedData,
+                $"Lấy thành công {groupedData.Count} câu hỏi cho chủ đề '{topicName}'",
+                200
+            );
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<IEnumerable<QuestionWithAnswersDTO>>.Fail(
+                "Lỗi server: " + ex.Message, 
+                500, 
+                "SERVER_ERROR"
+            );
+        }
+    }
+    
+    /// <summary>
+    /// Lấy danh sách câu hỏi theo tên chủ đề (không kèm câu trả lời)
+    /// </summary>
+    /// <param name="topicName">Tên chủ đề (ví dụ: "Toán học", "Lịch sử")</param>
+    /// <returns>Danh sách câu hỏi không kèm câu trả lời</returns>
+    public async Task<ApiResponse<IEnumerable<QuestionDTO>>> GetQuestionsByTopicNameAsync(string topicName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(topicName))
+            {
+                return ApiResponse<IEnumerable<QuestionDTO>>.Fail(
+                    "Tên chủ đề không được để trống", 
+                    400, 
+                    "INVALID_TOPIC_NAME"
+                );
+            }
+
+            // Lấy raw data từ repository
+            var rawData = await _questionRepository.GetQuestionsWithAnswersByTopicNameAsync(topicName);
+            
+            if (!rawData.Any())
+            {
+                return ApiResponse<IEnumerable<QuestionDTO>>.Fail(
+                    $"Không tìm thấy câu hỏi nào cho chủ đề '{topicName}'", 
+                    404, 
+                    "NO_QUESTIONS_FOUND"
+                );
+            }
+
+            // Chỉ lấy thông tin câu hỏi, không lấy câu trả lời
+            var questions = rawData
+                .GroupBy(r => new { r.QuestionId, r.QuestionText, r.TopicName })
+                .Select(g => new QuestionDTO(
+                    id: g.Key.QuestionId,
+                    questionText: g.Key.QuestionText,
+                    options: new List<AnswerDTO>(),
+                    topicId: 0, // Default value since we don't have topicId in the raw data
+                    questionTypeId: 0, // Default value
+                    timeLimit: 30, // Default time limit
+                    points: 100 // Default points
+                ))
+                .ToList();
+
+            return ApiResponse<IEnumerable<QuestionDTO>>.Success(
+                questions,
+                $"Lấy thành công {questions.Count} câu hỏi cho chủ đề '{topicName}'",
+                200
+            );
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<IEnumerable<QuestionDTO>>.Fail(
+                "Lỗi server: " + ex.Message, 
+                500, 
+                "SERVER_ERROR"
+            );
+        }
+    }
 }

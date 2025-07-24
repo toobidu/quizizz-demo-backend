@@ -1,8 +1,9 @@
 namespace ConsoleApp1.Model.DTO.Rooms;
+
 public class SocketConnectionDTO
 {
     public int Id { get; set; }
-    public string SocketId { get; set; }
+    public string SocketId { get; set; } = string.Empty;
     public int? UserId { get; set; }
     public int? RoomId { get; set; }
     public DateTime ConnectedAt { get; set; }

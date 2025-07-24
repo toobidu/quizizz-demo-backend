@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity.Users;
 using ConsoleApp1.Repository.Interface;
 using Dapper;
@@ -6,15 +7,13 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class RoleRepositoryImplement : IRoleRepository
 {
-    public readonly string ConnectionString;
-    public RoleRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public RoleRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    /*
-    T?o Connection
-    */
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<Role?> GetByIdAsync(int id)
     {
         const string query = @"SELECT * FROM roles WHERE id = @Id";

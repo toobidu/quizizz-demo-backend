@@ -1,7 +1,11 @@
 namespace ConsoleApp1.Model.DTO.Rooms;
+
 public class LeaderboardDTO
 {
-    public List<RankDTO> TopPlayers { get; set; }
-    public LeaderboardDTO(List<RankDTO> topPlayers) =>
-        TopPlayers = topPlayers;
+    public int UserId { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public int Score { get; set; }
+    public int CorrectAnswers { get; set; }
+    public int TotalAnswers { get; set; }
+    public int Rank { get; set; }
 }

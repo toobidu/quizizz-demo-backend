@@ -1,4 +1,5 @@
 using System.Data;
+using ConsoleApp1.Data;
 using ConsoleApp1.Model.Entity;
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
@@ -7,12 +8,12 @@ using Npgsql;
 namespace ConsoleApp1.Repository.Implement;
 public class RoomSettingsRepositoryImplement : IRoomSettingsRepository
 {
-    private readonly string ConnectionString;
-    public RoomSettingsRepositoryImplement(string connectionString)
+    private readonly DatabaseHelper _dbHelper;
+    public RoomSettingsRepositoryImplement(DatabaseHelper dbHelper)
     {
-        ConnectionString = connectionString;
+        _dbHelper = dbHelper;
     }
-    private IDbConnection CreateConnection() => new NpgsqlConnection(ConnectionString);
+    private IDbConnection CreateConnection() => _dbHelper.GetConnection();
     public async Task<IEnumerable<RoomSetting>> GetSettingsByRoomIdAsync(int roomId)
     {
         const string query = @"

@@ -55,7 +55,7 @@ public class GameSessionServiceImplement : IGameSessionService
     }
     public async Task<bool> EndGameSessionAsync(int id)
     {
-        return await _gameSessionRepository.EndGameSessionAsync(id, DateTime.Now);
+        return await _gameSessionRepository.EndGameSessionAsync(id);
     }
     public async Task<IEnumerable<GameQuestionDTO>> GetGameQuestionsAsync(int gameSessionId)
     {
@@ -76,7 +76,8 @@ public class GameSessionServiceImplement : IGameSessionService
                 TimeLimit = timeLimit
             });
         }
-        return await _gameQuestionRepository.CreateManyAsync(gameQuestions);
+        int result = await _gameQuestionRepository.CreateManyAsync(gameQuestions);
+        return result > 0;
     }
     private GameSessionDTO MapToDTO(GameSession gameSession)
     {
@@ -89,8 +90,7 @@ public class GameSessionServiceImplement : IGameSessionService
             StartTime = gameSession.StartTime,
             EndTime = gameSession.EndTime,
             TimeLimit = gameSession.TimeLimit,
-            CreatedAt = gameSession.CreatedAt,
-            UpdatedAt = gameSession.UpdatedAt
+            CreatedAt = gameSession.CreatedAt
         };
     }
     private GameQuestionDTO MapToDTO(GameQuestion gameQuestion)

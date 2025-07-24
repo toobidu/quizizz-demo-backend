@@ -2,15 +2,15 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using ConsoleApp1.Config;
-using ConsoleApp1.Controller;
+using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Model.Entity.Rooms;
 namespace ConsoleApp1.Router;
 public class GameSessionRouter : IBaseRouter
 {
-    private readonly GameSessionController _controller;
-    public GameSessionRouter(GameSessionController controller)
+    private readonly IGameSessionService _service;
+    public GameSessionRouter(IGameSessionService service)
     {
-        _controller = controller;
+        _service = service;
     }
     public async Task<bool> HandleAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
@@ -70,7 +70,8 @@ public class GameSessionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid game session ID", "/api/game-sessions");
             return;
         }
-        var apiResponse = await _controller.GetByIdAsync(id);
+        var gameSession = await _service.GetByIdAsync(id);
+        var apiResponse = ApiResponse<object>.Success(gameSession, "Lấy thông tin game session thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleGetByRoomId(HttpListenerRequest request, HttpListenerResponse response)
@@ -81,7 +82,8 @@ public class GameSessionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid room ID", "/api/game-sessions/by-room");
             return;
         }
-        var apiResponse = await _controller.GetByRoomIdAsync(roomId);
+        var gameSession = await _service.GetByRoomIdAsync(roomId);
+        var apiResponse = ApiResponse<object>.Success(gameSession, "Lấy thông tin game session theo phòng thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleCreate(HttpListenerRequest request, HttpListenerResponse response)
@@ -96,7 +98,8 @@ public class GameSessionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid game session data", "/api/game-sessions");
                 return;
             }
-            var apiResponse = await _controller.CreateAsync(gameSession);
+            var id = await _service.CreateAsync(gameSession);
+            var apiResponse = ApiResponse<object>.Success(new { id }, "Tạo game session thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -116,7 +119,8 @@ public class GameSessionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid game session data", "/api/game-sessions");
                 return;
             }
-            var apiResponse = await _controller.UpdateAsync(gameSession);
+            var result = await _service.UpdateAsync(gameSession);
+            var apiResponse = ApiResponse<object>.Success(new { success = result }, "Cập nhật game session thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -132,7 +136,8 @@ public class GameSessionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid game session ID", "/api/game-sessions");
             return;
         }
-        var apiResponse = await _controller.DeleteAsync(id);
+        var result = await _service.DeleteAsync(id);
+        var apiResponse = ApiResponse<object>.Success(new { success = result }, "Xóa game session thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleUpdateGameState(HttpListenerRequest request, HttpListenerResponse response)
@@ -153,7 +158,8 @@ public class GameSessionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid game state data", "/api/game-sessions/state");
                 return;
             }
-            var apiResponse = await _controller.UpdateGameStateAsync(id, data.GameState);
+            var result = await _service.UpdateGameStateAsync(id, data.GameState);
+            var apiResponse = ApiResponse<object>.Success(new { success = result }, "Cập nhật trạng thái game thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -179,7 +185,8 @@ public class GameSessionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid question index data", "/api/game-sessions/question-index");
                 return;
             }
-            var apiResponse = await _controller.UpdateCurrentQuestionIndexAsync(id, data.QuestionIndex);
+            var result = await _service.UpdateCurrentQuestionIndexAsync(id, data.QuestionIndex);
+            var apiResponse = ApiResponse<object>.Success(new { success = result }, "Cập nhật chỉ số câu hỏi thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -195,7 +202,8 @@ public class GameSessionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid game session ID", "/api/game-sessions/end");
             return;
         }
-        var apiResponse = await _controller.EndGameSessionAsync(id);
+        var result = await _service.EndGameSessionAsync(id);
+        var apiResponse = ApiResponse<object>.Success(new { success = result }, "Kết thúc game session thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleGetGameQuestions(HttpListenerRequest request, HttpListenerResponse response)
@@ -206,7 +214,8 @@ public class GameSessionRouter : IBaseRouter
             HttpResponseHelper.WriteBadRequest(response, "Invalid game session ID", "/api/game-sessions/questions");
             return;
         }
-        var apiResponse = await _controller.GetGameQuestionsAsync(gameSessionId);
+        var questions = await _service.GetGameQuestionsAsync(gameSessionId);
+        var apiResponse = ApiResponse<object>.Success(questions, "Lấy danh sách câu hỏi thành công");
         HttpResponseHelper.WriteJsonResponse(response, apiResponse);
     }
     private async Task HandleAddQuestionsToGameSession(HttpListenerRequest request, HttpListenerResponse response)
@@ -227,7 +236,8 @@ public class GameSessionRouter : IBaseRouter
                 HttpResponseHelper.WriteBadRequest(response, "Invalid question data", "/api/game-sessions/questions");
                 return;
             }
-            var apiResponse = await _controller.AddQuestionsToGameSessionAsync(gameSessionId, data.QuestionIds, data.TimeLimit);
+            var result = await _service.AddQuestionsToGameSessionAsync(gameSessionId, data.QuestionIds, data.TimeLimit);
+            var apiResponse = ApiResponse<object>.Success(new { success = result }, "Thêm câu hỏi vào game session thành công");
             HttpResponseHelper.WriteJsonResponse(response, apiResponse);
         }
         catch (JsonException)
@@ -238,7 +248,7 @@ public class GameSessionRouter : IBaseRouter
 }
 public class UpdateGameStateRequest
 {
-    public string GameState { get; set; }
+    public required string GameState { get; set; }
 }
 public class UpdateQuestionIndexRequest
 {
@@ -246,7 +256,7 @@ public class UpdateQuestionIndexRequest
 }
 public class AddQuestionsRequest
 {
-    public List<int> QuestionIds { get; set; }
+    public required List<int> QuestionIds { get; set; }
     public int TimeLimit { get; set; }
 }
 // Helper class for parsing query parameters

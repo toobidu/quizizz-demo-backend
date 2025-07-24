@@ -1,22 +1,13 @@
-using ConsoleApp1.Model.DTO.Questions;
 namespace ConsoleApp1.Model.DTO.Rooms.Games;
+
 public class GameSummaryDTO
 {
-    public string RoomCode { get; set; }
-    public DateTime GameDate { get; set; }
+    public int SessionId { get; set; }
+    public int RoomId { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public TimeSpan Duration { get; set; }
     public int TotalQuestions { get; set; }
-    public List<PlayerProgressDTO> FinalResults { get; set; }
-    public List<QuestionStatisticsDTO> QuestionStats { get; set; }
-    public TimeSpan TotalGameTime { get; set; }
-    public GameSummaryDTO(string roomCode, DateTime gameDate, int totalQuestions,
-        List<PlayerProgressDTO> finalResults, List<QuestionStatisticsDTO> questionStats,
-        TimeSpan totalGameTime)
-    {
-        RoomCode = roomCode;
-        GameDate = gameDate;
-        TotalQuestions = totalQuestions;
-        FinalResults = finalResults;
-        QuestionStats = questionStats;
-        TotalGameTime = totalGameTime;
-    }
+    public List<LeaderboardDTO> Leaderboard { get; set; } = new List<LeaderboardDTO>();
+    public object Stats { get; set; } = new object();
 }

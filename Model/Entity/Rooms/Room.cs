@@ -22,6 +22,12 @@ public class Room
     public bool IsPrivate { get; set; }
     [Column("owner_id")]
     public int OwnerId { get; set; }
+    
+    // Alias for OwnerId to maintain compatibility
+    public int HostUserId { 
+        get { return OwnerId; }
+        set { OwnerId = value; }
+    }
     public string Status { get; set; } = string.Empty;
     [Column("max_players")]
     public int MaxPlayers { get; set; }

@@ -3,7 +3,7 @@ public class GameSession
 {
     public int Id { get; set; }
     public int RoomId { get; set; }
-    public string GameState { get; set; }
+    public required string GameState { get; set; }
     public int CurrentQuestionIndex { get; set; }
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
@@ -11,5 +11,5 @@ public class GameSession
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     // Navigation properties
-    public Room Room { get; set; }
+    public Room? Room { get; set; }
 }
