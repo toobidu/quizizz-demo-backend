@@ -92,14 +92,15 @@ public class CreateRoomServiceImplement : ICreateRoomService
         var playerCount = await _roomRepository.GetPlayerCountAsync(roomId);
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         var roomDto = RoomMapper.ToDTO(room);
-        // Broadcast room created v� c?p nh?t danh s�ch ngu?i choi
+        // Broadcast room created và cập nhật danh sách người chơi
         try
         {
             await _broadcastService.BroadcastRoomCreatedAsync(roomDto);
             await _broadcastService.BroadcastRoomPlayersUpdateAsync(roomCode);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
+            // Log error but don't throw to avoid breaking the flow
         }
         return roomDto;
     }
