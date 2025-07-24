@@ -1,14 +1,16 @@
 using ConsoleApp1.Model.DTO.WebSocket;
 using ConsoleApp1.Model.DTO.Game;
+using ConsoleApp1.Service.Implement.Socket.RoomManagement;
+using ConsoleApp1.Config;
 namespace ConsoleApp1.Service.Helper;
 /// <summary>
 /// Helper class để tạo WebSocket events với format chuẩn hóa
-/// Đảm bảo tất cả WebSocket messages đều có format camelCase nhất quán
+/// Đảm bảo tất cả WebSocket messages đều có format kebab-case nhất quán
 /// </summary>
 public static class WebSocketEventHelper
 {
     /// <summary>
-    /// Tạo PLAYER_JOINED event
+    /// Tạo player-joined event
     /// </summary>
     public static WebSocketMessage<PlayerJoinedData> CreatePlayerJoinedEvent(int userId, string username, string roomCode, bool isHost)
     {
@@ -20,10 +22,10 @@ public static class WebSocketEventHelper
             IsHost = isHost,
             JoinTime = DateTime.UtcNow
         };
-        return new WebSocketMessage<PlayerJoinedData>("PLAYER_JOINED", data);
+        return new WebSocketMessage<PlayerJoinedData>(RoomManagementConstants.Events.PlayerJoined, data);
     }
     /// <summary>
-    /// Tạo PLAYER_LEFT event
+    /// Tạo player-left event
     /// </summary>
     public static WebSocketMessage<PlayerLeftData> CreatePlayerLeftEvent(int userId, string username, string roomCode)
     {
@@ -33,10 +35,10 @@ public static class WebSocketEventHelper
             Username = username,
             RoomCode = roomCode
         };
-        return new WebSocketMessage<PlayerLeftData>("PLAYER_LEFT", data);
+        return new WebSocketMessage<PlayerLeftData>(RoomManagementConstants.Events.PlayerLeft, data);
     }
     /// <summary>
-    /// Tạo ROOM_PLAYERS_UPDATED event
+    /// Tạo room-players-updated event
     /// </summary>
     public static WebSocketMessage<RoomPlayersUpdatedData> CreateRoomPlayersUpdatedEvent(string roomCode, List<GamePlayer> players, int maxPlayers = 10)
     {
@@ -58,10 +60,10 @@ public static class WebSocketEventHelper
             MaxPlayers = maxPlayers,
             Host = host
         };
-        return new WebSocketMessage<RoomPlayersUpdatedData>("ROOM_PLAYERS_UPDATED", data);
+        return new WebSocketMessage<RoomPlayersUpdatedData>(RoomManagementConstants.Events.RoomPlayersUpdated, data);
     }
     /// <summary>
-    /// Tạo HOST_CHANGED event
+    /// Tạo host-changed event
     /// </summary>
     public static WebSocketMessage<HostChangedData> CreateHostChangedEvent(string roomCode, GamePlayer newHost, GamePlayer? oldHost = null)
     {
@@ -93,7 +95,7 @@ public static class WebSocketEventHelper
             NewHost = newHostInfo,
             OldHost = oldHostInfo
         };
-        return new WebSocketMessage<HostChangedData>("HOST_CHANGED", data);
+        return new WebSocketMessage<HostChangedData>(RoomManagementConstants.Events.HostChanged, data);
     }
     /// <summary>
     /// Tạo WebSocket message với anonymous object (fallback)

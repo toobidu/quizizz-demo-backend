@@ -31,7 +31,7 @@ public class RoomEventBroadcaster
         // Sử dụng WebSocketEventHelper để tạo event chuẩn hóa
         var eventMessage = WebSocketEventHelper.CreateRoomPlayersUpdatedEvent(roomCode, players);
         // Chỉ gửi một lần duy nhất cho mỗi phòng
-        await BroadcastToRoomAsync(roomCode, "ROOM_PLAYERS_UPDATED", eventMessage.Data!, true);
+        await BroadcastToRoomAsync(roomCode, RoomManagementConstants.Events.RoomPlayersUpdated, eventMessage.Data!, true);
     }
     /// <summary>
     /// Broadcast room players update with player-joined event
@@ -48,7 +48,7 @@ public class RoomEventBroadcaster
                 roomCode, 
                 newPlayer.IsHost
             );
-            await BroadcastToRoomAsync(roomCode, "PLAYER_JOINED", playerJoinedEvent.Data!);
+            await BroadcastToRoomAsync(roomCode, RoomManagementConstants.Events.PlayerJoined, playerJoinedEvent.Data!);
         }
         // Sau đó gửi event RoomPlayersUpdated
         await BroadcastRoomPlayersUpdateAsync(roomCode, players);
@@ -65,7 +65,7 @@ public class RoomEventBroadcaster
             userId = leftPlayer.UserId,
             username = leftPlayer.Username
         };
-        await BroadcastToRoomAsync(roomCode, "player-left", playerLeftData);
+        await BroadcastToRoomAsync(roomCode, RoomManagementConstants.Events.PlayerLeft, playerLeftData);
         // Đợi một chút để đảm bảo client xử lý sự kiện player-left trước
         await Task.Delay(200);
         // Sau đó gửi event RoomPlayersUpdated
@@ -82,7 +82,7 @@ public class RoomEventBroadcaster
             newHostId = newHost.UserId,
             message = $"{newHost.Username} đã trở thành host mới"
         };
-        await BroadcastToRoomAsync(roomCode, "host-changed", eventData);
+        await BroadcastToRoomAsync(roomCode, RoomManagementConstants.Events.HostChanged, eventData);
     }
     /// <summary>
     /// Send welcome message to player
@@ -95,14 +95,14 @@ public class RoomEventBroadcaster
             isHost = isHost,
             message = message
         };
-        await SendToPlayerAsync(socketId, "room-joined", eventData);
+        await SendToPlayerAsync(socketId, RoomManagementConstants.Events.RoomJoined, eventData);
     }
     /// <summary>
     /// Broadcast player-joined event to other players in room
     /// </summary>
     public async Task BroadcastPlayerJoinedEventAsync(string roomCode, object playerData)
     {
-        await BroadcastToRoomAsync(roomCode, "player-joined", playerData);
+        await BroadcastToRoomAsync(roomCode, RoomManagementConstants.Events.PlayerJoined, playerData);
     }
     /// <summary>
     /// Gửi message đến tất cả client trong một phòng cụ thể
@@ -114,7 +114,7 @@ public class RoomEventBroadcaster
     public async Task BroadcastToRoomAsync(string roomCode, string eventName, object data, bool preventDuplicates = false)
     {
         // Nếu cần ngăn chặn trùng lặp và là sự kiện room-players-updated
-        if (preventDuplicates && eventName == "room-players-updated")
+        if (preventDuplicates && eventName == RoomManagementConstants.Events.RoomPlayersUpdated)
         {
             // Tạo key để theo dõi sự kiện đã gửi
             string cacheKey = $"last_update_{roomCode}";

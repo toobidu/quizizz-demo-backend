@@ -1,10 +1,12 @@
 using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
+using ConsoleApp1.Service.Implement.Socket.RoomManagement;
 using System.Text.Json;
 using System.Net.WebSockets;
 using System.Text;
 using System.Collections.Concurrent;
+using ConsoleApp1.Config;
 namespace ConsoleApp1.Service.Implement;
 public class BroadcastServiceImplement : IBroadcastService
 {
@@ -88,7 +90,7 @@ public class BroadcastServiceImplement : IBroadcastService
             // Chỉ gửi một lần duy nhất qua WebSocket
             try {
                 // Gửi trực tiếp sự kiện với dữ liệu đầy đủ
-                await _socketService.BroadcastToAllConnectionsAsync(roomCode, "room-players-updated", message.Data);
+                await _socketService.BroadcastToAllConnectionsAsync(roomCode, RoomManagementConstants.Events.RoomPlayersUpdated, message.Data);
             }
             catch (Exception ex) {
             }

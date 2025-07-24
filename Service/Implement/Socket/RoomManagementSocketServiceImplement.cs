@@ -4,6 +4,7 @@ using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
+using ConsoleApp1.Config;
 namespace ConsoleApp1.Service.Implement.Socket;
 /// <summary>
 /// Service quản lý phòng chơi qua WebSocket - Chịu trách nhiệm:
@@ -87,7 +88,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                         status = "waiting", // Giá trị mặc định vì GameRoom không có thuộc tính Status
                         host = existingRoom.Players.FirstOrDefault(p => p.IsHost)?.Username
                     };
-                    await _eventBroadcaster.SendToPlayerAsync(socketId, "room-players-updated", existingRoomData);
+                    await _eventBroadcaster.SendToPlayerAsync(socketId, RoomManagementConstants.Events.RoomPlayersUpdated, existingRoomData);
                 }
                 return;
             }
@@ -122,7 +123,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                     isHost = existingPlayer.IsHost,
                     timeTaken = "00:00:00"
                 };
-                await _eventBroadcaster.SendToPlayerAsync(socketId, "player-joined", playerData);
+                await _eventBroadcaster.SendToPlayerAsync(socketId, RoomManagementConstants.Events.PlayerJoined, playerData);
             }
             // Gửi sự kiện room-players-updated cho người chơi mới
             var roomPlayersData = new
@@ -141,7 +142,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                 status = "waiting", // Giá trị mặc định vì GameRoom không có thuộc tính Status
                 host = room.Players.FirstOrDefault(p => p.IsHost)?.Username
             };
-            await _eventBroadcaster.SendToPlayerAsync(socketId, "room-players-updated", roomPlayersData);
+            await _eventBroadcaster.SendToPlayerAsync(socketId, RoomManagementConstants.Events.RoomPlayersUpdated, roomPlayersData);
             // Broadcast sự kiện player-joined cho các user khác trong phòng (không gửi cho chính user vừa join)
             await BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
             // Gửi sự kiện room-players-updated đến tất cả người chơi trong phòng
@@ -274,7 +275,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                 timeTaken = "00:00:00"
             };
             // Broadcast chỉ tới những người đã có trong phòng trước đó (loại trừ người vừa join)
-            await _eventBroadcaster.BroadcastToOthersAsync(roomCode, userId, "player-joined", playerJoinedData);
+            await _eventBroadcaster.BroadcastToOthersAsync(roomCode, userId, RoomManagementConstants.Events.PlayerJoined, playerJoinedData);
         }
         catch (Exception ex)
         {
@@ -407,7 +408,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                 status = "waiting",
                 host = room.Players.FirstOrDefault(p => p.IsHost)?.Username
             };
-            await _eventBroadcaster.SendToPlayerAsync(socketId, "room-players-updated", roomPlayersData);
+            await _eventBroadcaster.SendToPlayerAsync(socketId, RoomManagementConstants.Events.RoomPlayersUpdated, roomPlayersData);
         }
         catch (Exception ex)
         {

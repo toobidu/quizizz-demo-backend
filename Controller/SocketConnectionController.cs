@@ -3,6 +3,7 @@ using ConsoleApp1.Model.DTO.Rooms;
 using ConsoleApp1.Model.Entity.Rooms;
 using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Service.Interface;
+using ConsoleApp1.Service.Implement.Socket.RoomManagement;
 
 namespace ConsoleApp1.Controller;
 
@@ -140,7 +141,7 @@ public class SocketConnectionController
 
                 if (room != null && user != null)
                 {
-                    await _socketService.BroadcastToRoomAsync(room.RoomCode, "player-left", new
+                    await _socketService.BroadcastToRoomAsync(room.RoomCode, RoomManagementConstants.Events.PlayerLeft, new
                     {
                         userId = user.Id,
                         username = user.Username
