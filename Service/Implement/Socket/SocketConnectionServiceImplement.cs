@@ -23,10 +23,18 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
     // Dictionary ánh xạ socketId với roomCode (shared)
     private readonly ConcurrentDictionary<string, string> _socketToRoom;
+    // Dictionary ánh xạ socketId với userId để track users
+    private readonly ConcurrentDictionary<string, int> _socketToUserId;
+    // Dictionary theo dõi last pong time cho mỗi connection
+    private readonly ConcurrentDictionary<string, DateTime> _lastPongReceived;
     // HttpListener để lắng nghe các WebSocket request
     private HttpListener? _listener;
     // Reference tới RoomManagementSocketService để xử lý joinRoom
     private IRoomManagementSocketService? _roomManagementService;
+
+    // ✅ TĂNG PONG TIMEOUT LÊN 120 GIÂY
+    private const int PONG_TIMEOUT_SECONDS = 120;
+    private const int PING_INTERVAL_SECONDS = 30;
 
     /// <summary>
     /// Constructor nhận shared dictionaries
@@ -37,6 +45,8 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
     {
         _connections = connections;
         _socketToRoom = socketToRoom;
+        _socketToUserId = new ConcurrentDictionary<string, int>();
+        _lastPongReceived = new ConcurrentDictionary<string, DateTime>();
     }
 
     /// <summary>
@@ -46,6 +56,8 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
     {
         _connections = new ConcurrentDictionary<string, WebSocket>();
         _socketToRoom = new ConcurrentDictionary<string, string>();
+        _socketToUserId = new ConcurrentDictionary<string, int>();
+        _lastPongReceived = new ConcurrentDictionary<string, DateTime>();
     }
 
     /// <summary>
@@ -259,9 +271,9 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 {
                     pingCount++;
                     
-                    // ✅ CHECK PONG TIMEOUT (60 seconds)
+                    // ✅ CHECK PONG TIMEOUT (120 seconds)
                     var timeSinceLastPong = DateTime.UtcNow - lastPongReceived;
-                    if (timeSinceLastPong.TotalSeconds > 60)
+                    if (timeSinceLastPong.TotalSeconds > PONG_TIMEOUT_SECONDS)
                     {
                         Console.WriteLine($"⏰ [WebSocket] Pong timeout for {socketId} ({timeSinceLastPong.TotalSeconds:F1}s)");
                         Console.WriteLine($"🔌 [WebSocket] Closing connection {socketId} due to pong timeout");
@@ -317,11 +329,13 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                         
                         Console.WriteLine($"📥 [WebSocket] Message #{messageCount} from {socketId}: {message}");
                         
-                        // Track pong responses
-                        if (message.Contains("\"type\":\"pong\"") || message.Contains("\"event\":\"pong\""))
+                        // Track pong responses và heartbeat
+                        if (message.Contains("\"type\":\"pong\"") || message.Contains("\"event\":\"pong\"") || 
+                            message.Contains("\"event\":\"heartbeat\"") || message.Contains("\"type\":\"heartbeat\""))
                         {
                             lastPongReceived = DateTime.UtcNow;
-                            Console.WriteLine($"🏓 [WebSocket] Received pong from {socketId}");
+                            _lastPongReceived[socketId] = DateTime.UtcNow;
+                            Console.WriteLine($"🏓 [WebSocket] Received pong/heartbeat from {socketId}");
                         }
                         
                         await ProcessWebSocketMessage(socketId, message);
@@ -409,7 +423,9 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 finally
                 {
                     _socketToRoom.TryRemove(socketId, out _);
-                    Console.WriteLine($"🧹 [WebSocket] Removed socket-to-room mapping for {socketId}");
+                    _socketToUserId.TryRemove(socketId, out _);
+                    _lastPongReceived.TryRemove(socketId, out _);
+                    Console.WriteLine($"🧹 [WebSocket] Removed socket-to-room and user mappings for {socketId}");
                 }
             }
             
@@ -492,6 +508,12 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                     break;
                 case "pong":
                     Console.WriteLine($"🏓 [Message] Pong received from {socketId}");
+                    break;
+                case "heartbeat":
+                    await HandleHeartbeatEvent(socketId, data);
+                    break;
+                case "player-left":
+                    await HandlePlayerLeftEvent(socketId, data);
                     break;
                 default:
                     Console.WriteLine($"⚠️ [Message] Unhandled event '{eventName}' from {socketId}");
@@ -652,15 +674,53 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            // Lưu mapping socketId -> roomCode
+            // Lưu mapping socketId -> roomCode và socketId -> userId
             _socketToRoom[socketId] = roomCode;
+            _socketToUserId[socketId] = userId;
 
             // Sử dụng shared RoomManagementSocketService
             if (_roomManagementService != null)
             {
                 await _roomManagementService.JoinRoomAsync(socketId, roomCode, username, userId);
                 await SendAckResponse(socketId, "join-room", true, "Successfully joined room");
+                
                 Console.WriteLine($"✅ [SocketConnectionService] {username} joined room {roomCode}");
+                
+                // Gửi sự kiện players-updated sau khi join thành công
+                try
+                {
+                    var room = await _roomManagementService.GetRoomAsync(roomCode);
+                    if (room != null)
+                    {
+                        // Broadcast player-joined event
+                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-joined", new
+                        {
+                            userId = userId,
+                            username = username,
+                            isHost = room.Players.Any(p => p.UserId == userId && p.IsHost),
+                            roomCode = roomCode,
+                            timestamp = DateTime.UtcNow
+                        });
+                        
+                        // Broadcast players-updated event để đồng bộ danh sách
+                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
+                        {
+                            players = room.Players.Select(p => new { 
+                                userId = p.UserId, 
+                                username = p.Username, 
+                                isHost = p.IsHost,
+                                status = p.Status ?? "waiting"
+                            }).ToList(),
+                            roomCode = roomCode
+                        });
+                        
+                        Console.WriteLine($"📡 [SocketConnectionService] Broadcasted player-joined and players-updated for {username} in room {roomCode}");
+                    }
+                }
+                catch (Exception broadcastEx)
+                {
+                    Console.WriteLine($"❌ [SocketConnectionService] Error broadcasting join events: {broadcastEx.Message}");
+                }
             }
             else
             {
@@ -733,10 +793,37 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                     await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
                 }
 
-                // Xóa mapping socketId -> roomCode
+                // Xóa mapping
                 _socketToRoom.TryRemove(socketId, out _);
+                _socketToUserId.TryRemove(socketId, out _);
 
                 await SendAckResponse(socketId, "leave-room", true, "Successfully left room");
+                
+                // Gửi players-updated event sau khi leave
+                try
+                {
+                    var room = await _roomManagementService.GetRoomAsync(roomCode);
+                    if (room != null)
+                    {
+                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
+                        {
+                            players = room.Players.Select(p => new { 
+                                userId = p.UserId, 
+                                username = p.Username, 
+                                isHost = p.IsHost,
+                                status = p.Status ?? "waiting"
+                            }).ToList(),
+                            roomCode = roomCode
+                        });
+                        
+                        Console.WriteLine($"📡 [SocketConnectionService] Broadcasted players-updated after leave in room {roomCode}");
+                    }
+                }
+                catch (Exception broadcastEx)
+                {
+                    Console.WriteLine($"❌ [SocketConnectionService] Error broadcasting leave events: {broadcastEx.Message}");
+                }
+                
                 Console.WriteLine($"✅ [SocketConnectionService] Socket {socketId} left room {roomCode}");
             }
             else
@@ -831,6 +918,125 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         catch (Exception ex)
         {
             Console.WriteLine($"❌ [SocketConnectionService] Error in HandlePingEvent: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Xử lý heartbeat event từ client để maintain connection
+    /// </summary>
+    private async Task HandleHeartbeatEvent(string socketId, Dictionary<string, object> data)
+    {
+        try
+        {
+            Console.WriteLine($"💓 [SocketConnectionService] Heartbeat received from {socketId}");
+            
+            // Cập nhật last heartbeat time
+            _lastPongReceived[socketId] = DateTime.UtcNow;
+            
+            // Send heartbeat response với status ok
+            var heartbeatResponse = new
+            {
+                @event = "heartbeat",
+                data = new
+                {
+                    status = "ok",
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    socketId = socketId
+                },
+                timestamp = DateTime.UtcNow
+            };
+
+            await SendMessageToSocketAsync(socketId, heartbeatResponse);
+            Console.WriteLine($"💓 [SocketConnectionService] Heartbeat response sent to {socketId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error in HandleHeartbeatEvent: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Xử lý player-left event từ client
+    /// </summary>
+    private async Task HandlePlayerLeftEvent(string socketId, Dictionary<string, object> data)
+    {
+        try
+        {
+            Console.WriteLine($"🚪 [SocketConnectionService] player-left received from {socketId}");
+            
+            // Lấy thông tin từ message
+            var roomCode = ExtractStringValue(data, "roomCode");
+            var userIdStr = ExtractStringValue(data, "userId");
+            var username = ExtractStringValue(data, "username");
+            
+            // Nếu không có roomCode, lấy từ mapping
+            if (string.IsNullOrEmpty(roomCode))
+            {
+                _socketToRoom.TryGetValue(socketId, out roomCode);
+            }
+            
+            if (string.IsNullOrEmpty(roomCode))
+            {
+                await SendAckResponse(socketId, "player-left", false, "Room code not found");
+                return;
+            }
+            
+            Console.WriteLine($"🚪 [SocketConnectionService] Processing player-left: roomCode={roomCode}, userId={userIdStr}, username={username}");
+            
+            if (_roomManagementService != null)
+            {
+                // Nếu có userId, sử dụng để xóa player khỏi database
+                if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+                {
+                    await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
+                    
+                    // Broadcast player-left event cho các players khác
+                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-left", new
+                    {
+                        userId = userId,
+                        username = username ?? "Unknown",
+                        roomCode = roomCode,
+                        timestamp = DateTime.UtcNow
+                    });
+                    
+                    // Gửi players-updated event để đồng bộ danh sách
+                    var room = await _roomManagementService.GetRoomAsync(roomCode);
+                    if (room != null)
+                    {
+                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
+                        {
+                            players = room.Players.Select(p => new { 
+                                userId = p.UserId, 
+                                username = p.Username, 
+                                isHost = p.IsHost,
+                                status = p.Status
+                            }).ToList(),
+                            roomCode = roomCode
+                        });
+                    }
+                }
+                else
+                {
+                    await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+                }
+                
+                // Xóa mapping
+                _socketToRoom.TryRemove(socketId, out _);
+                _socketToUserId.TryRemove(socketId, out _);
+                
+                await SendAckResponse(socketId, "player-left", true, "Player left successfully");
+                Console.WriteLine($"✅ [SocketConnectionService] Player left room {roomCode} successfully");
+            }
+            else
+            {
+                await SendAckResponse(socketId, "player-left", false, "Room service not available");
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService not available");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error handling player-left: {ex.Message}");
+            await SendAckResponse(socketId, "player-left", false, "Internal server error");
         }
     }
 

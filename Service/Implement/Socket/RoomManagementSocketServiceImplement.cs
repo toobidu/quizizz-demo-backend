@@ -143,8 +143,12 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                 host = room.Players.FirstOrDefault(p => p.IsHost)?.Username
             };
             await _eventBroadcaster.SendToPlayerAsync(socketId, RoomManagementConstants.Events.RoomPlayersUpdated, roomPlayersData);
-            // Broadcast sự kiện player-joined cho các user khác trong phòng (không gửi cho chính user vừa join)
-            await BroadcastPlayerJoinedEventAsync(roomCode, userId, username);
+            
+            // ✅ SỬA: Broadcast sự kiện player-joined cho các user khác trong phòng (không gửi cho chính user vừa join)
+            // Thay thế BroadcastPlayerJoinedEventAsync bằng method trực tiếp để fix vấn đề broadcast
+            // await BroadcastPlayerJoinedEventAsync(roomCode, userId, username); // <- Comment dòng cũ
+            await BroadcastPlayerJoinedToOthersAsync(roomCode, userId, username); // <- Sử dụng method mới
+            
             // Gửi sự kiện room-players-updated đến tất cả người chơi trong phòng
             // Đảm bảo sự kiện này được gửi sau sự kiện player-joined
             await UpdateRoomPlayersAsync(roomCode);
@@ -245,6 +249,83 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
         {
         }
     }
+
+    /// <summary>
+    /// Broadcast sự kiện player-joined đến những người chơi khác trong phòng (TRỰC TIẾP)
+    /// KHÔNG gửi cho người vừa join để tránh duplicate event
+    /// Method này thay thế cho BroadcastPlayerJoinedEventAsync để fix vấn đề broadcast
+    /// </summary>
+    /// <param name="roomCode">Mã phòng</param>
+    /// <param name="newUserId">ID người chơi mới (sẽ bị loại trừ)</param>
+    /// <param name="username">Tên người chơi mới</param>
+    private async Task BroadcastPlayerJoinedToOthersAsync(string roomCode, int newUserId, string username)
+    {
+        try
+        {
+            var room = _roomManager.GetRoom(roomCode);
+            if (room == null || room.Players.Count <= 1)
+            {
+                Console.WriteLine($"🏠 [RoomManagement] No other players to notify in room {roomCode}");
+                return;
+            }
+
+            var playerJoinedData = new
+            {
+                userId = newUserId,
+                username = username,
+                score = 0,
+                timeTaken = "00:00:00",
+                roomCode = roomCode,
+                timestamp = DateTime.UtcNow
+            };
+
+            var messageObj = new
+            {
+                type = RoomManagementConstants.Events.PlayerJoined,
+                data = playerJoinedData,
+                timestamp = DateTime.UtcNow
+            };
+
+            var message = JsonSerializer.Serialize(messageObj, new JsonSerializerOptions 
+            { 
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+            });
+            var buffer = System.Text.Encoding.UTF8.GetBytes(message);
+
+            // Gửi chỉ đến những người chơi KHÁC (trừ người vừa join)
+            var otherPlayers = room.Players.Where(p => p.UserId != newUserId && !string.IsNullOrEmpty(p.SocketId)).ToList();
+            
+            Console.WriteLine($"🎯 [RoomManagement] Broadcasting player-joined to {otherPlayers.Count} other players in room {roomCode}");
+
+            var sendTasks = otherPlayers.Select(async player =>
+            {
+                if (_connections.TryGetValue(player.SocketId!, out var socket) && socket.State == WebSocketState.Open)
+                {
+                    try
+                    {
+                        await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+                        Console.WriteLine($"📤 [RoomManagement] Sent player-joined to {player.Username} (userId: {player.UserId})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ [RoomManagement] Failed to send player-joined to {player.Username}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ [RoomManagement] Socket not found or not open for {player.Username}");
+                }
+            });
+
+            await Task.WhenAll(sendTasks);
+            Console.WriteLine($"✅ [RoomManagement] Completed broadcasting player-joined for {username} in room {roomCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [RoomManagement] Error in BroadcastPlayerJoinedToOthersAsync: {ex.Message}");
+        }
+    }
+
     // Dictionary để theo dõi thời gian gửi sự kiện player-joined cuối cùng cho mỗi người chơi
     private readonly ConcurrentDictionary<string, DateTime> _lastPlayerJoinedTimes = new();
     /// <summary>
