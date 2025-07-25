@@ -105,6 +105,7 @@ internal class Program
 
         // Set dependencies between services
         socketConnectionService.SetRoomManagementService(roomManagementSocketService);
+        socketConnectionService.SetGameFlowService(gameFlowSocketService); // Đảm bảo service game luôn sẵn sàng
 
         // Initialize composite SocketService
         ISocketService socketService = new SocketServiceImplement(
