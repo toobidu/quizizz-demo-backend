@@ -183,7 +183,9 @@ public class SocketConnectionServiceImplement : ConsoleApp1.Service.Interface.So
 
     private bool IsValidWebSocketPath(string path)
     {
-        return path == "/" || path.StartsWith("/waiting-room/", StringComparison.OrdinalIgnoreCase);
+        return path == "/" ||
+               path.StartsWith("/waiting-room/", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWith("/ws/waiting-room/", StringComparison.OrdinalIgnoreCase);
     }
 
     private string? ExtractRoomCodeFromPath(string path)
@@ -191,6 +193,14 @@ public class SocketConnectionServiceImplement : ConsoleApp1.Service.Interface.So
         if (path.StartsWith("/waiting-room/", StringComparison.OrdinalIgnoreCase))
         {
             var roomCode = path.Substring("/waiting-room/".Length);
+            if (!string.IsNullOrEmpty(roomCode) && IsValidRoomCode(roomCode))
+            {
+                return roomCode;
+            }
+        }
+        else if (path.StartsWith("/ws/waiting-room/", StringComparison.OrdinalIgnoreCase))
+        {
+            var roomCode = path.Substring("/ws/waiting-room/".Length);
             if (!string.IsNullOrEmpty(roomCode) && IsValidRoomCode(roomCode))
             {
                 return roomCode;
