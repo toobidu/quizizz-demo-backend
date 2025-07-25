@@ -2,6 +2,7 @@ using ConsoleApp1.Model.DTO.Game;
 using ConsoleApp1.Model.DTO.WebSocket;
 using ConsoleApp1.Config;
 using ConsoleApp1.Service.Helper;
+using ConsoleApp1.Service.Interface;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
@@ -16,12 +17,19 @@ public class RoomEventBroadcaster
     private readonly ConcurrentDictionary<string, GameRoom> _gameRooms;
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
     private readonly ConcurrentDictionary<string, DateTime> _lastUpdateTimes = new();
+    private readonly ISocketConnectionDbService? _socketConnectionDbService;
+    private readonly ConcurrentDictionary<string, string>? _socketToRoom;
+
     public RoomEventBroadcaster(
         ConcurrentDictionary<string, GameRoom> gameRooms,
-        ConcurrentDictionary<string, WebSocket> connections)
+        ConcurrentDictionary<string, WebSocket> connections,
+        ISocketConnectionDbService? socketConnectionDbService = null,
+        ConcurrentDictionary<string, string>? socketToRoom = null)
     {
         _gameRooms = gameRooms;
         _connections = connections;
+        _socketConnectionDbService = socketConnectionDbService;
+        _socketToRoom = socketToRoom;
     }
     /// <summary>
     /// Broadcast room players update
@@ -226,33 +234,106 @@ public class RoomEventBroadcaster
         }
     }
     /// <summary>
-    /// Broadcast message đến tất cả WebSocket connections hiện tại
+    /// Broadcast message đến tất cả connections trong room code
     /// Dùng khi cần gửi event mà không cần dựa vào in-memory game rooms
     /// </summary>
     public async Task BroadcastToAllConnectionsAsync(string roomCode, string eventName, object data)
     {
-        var messageObj = new {
-            type = eventName,
-            data = data,
-            timestamp = DateTime.UtcNow
-        };
-        // Sử dụng JsonSerializerConfig để đảm bảo camelCase format
-        var message = JsonSerializerConfig.SerializeCamelCase(messageObj);
-        var buffer = Encoding.UTF8.GetBytes(message);
-        // Gửi đến tất cả active WebSocket connections
-        var sendTasks = _connections.Values
-            .Where(socket => socket.State == WebSocketState.Open)
-            .Select(async socket =>
+        try
+        {
+            Console.WriteLine($"📡 [RoomEventBroadcaster] Broadcasting {eventName} to room {roomCode}");
+
+            var messageObj = new {
+                type = eventName,
+                data = data,
+                timestamp = DateTime.UtcNow
+            };
+
+            var message = JsonSerializerConfig.SerializeCamelCase(messageObj);
+            var buffer = Encoding.UTF8.GetBytes(message);
+
+            // ✅ TIER 1: LẤY TỪ MEMORY
+            if (_gameRooms.TryGetValue(roomCode, out var gameRoom) && gameRoom.Players.Count > 0)
+            {
+                Console.WriteLine($"✅ [RoomEventBroadcaster] Found {gameRoom.Players.Count} players in memory for room {roomCode}");
+                
+                var sendTasks = gameRoom.Players
+                    .Where(p => !string.IsNullOrEmpty(p.SocketId))
+                    .Select(async player =>
+                    {
+                        if (_connections.TryGetValue(player.SocketId!, out var socket) &&
+                            socket.State == WebSocketState.Open)
+                        {
+                            try
+                            {
+                                await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+                                Console.WriteLine($"✅ [RoomEventBroadcaster] Sent {eventName} to player {player.Username} ({player.SocketId})");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"❌ [RoomEventBroadcaster] Failed to send to {player.Username}: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"⚠️ [RoomEventBroadcaster] Socket not found or closed for player {player.Username} ({player.SocketId})");
+                        }
+                    });
+
+                await Task.WhenAll(sendTasks);
+                return;
+            }
+            
+            Console.WriteLine($"⚠️ [RoomEventBroadcaster] Room {roomCode} not in memory, querying database...");
+
+            // ✅ TIER 2: QUERY DATABASE
+            if (_socketConnectionDbService != null)
             {
                 try
                 {
-                    await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+                    var dbConnections = await _socketConnectionDbService.GetByRoomCodeAsync(roomCode);
+                    var activeSockets = dbConnections
+                        .Where(conn => _connections.ContainsKey(conn.SocketId))
+                        .ToList();
+
+                    Console.WriteLine($"� [RoomEventBroadcaster] Found {activeSockets.Count} active database connections for room {roomCode}");
+
+                    if (activeSockets.Any())
+                    {
+                        var sendTasks = activeSockets.Select(async conn =>
+                        {
+                            if (_connections.TryGetValue(conn.SocketId, out var socket) &&
+                                socket.State == WebSocketState.Open)
+                            {
+                                try
+                                {
+                                    await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+                                    Console.WriteLine($"✅ [RoomEventBroadcaster] Sent {eventName} to socket {conn.SocketId}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"❌ [RoomEventBroadcaster] Failed to send to socket {conn.SocketId}: {ex.Message}");
+                                }
+                            }
+                        });
+
+                        await Task.WhenAll(sendTasks);
+                        return;
+                    }
                 }
                 catch (Exception ex)
                 {
+                    Console.WriteLine($"❌ [RoomEventBroadcaster] Error querying database for room {roomCode}: {ex.Message}");
                 }
-            });
-        await Task.WhenAll(sendTasks);
+            }
+            
+            // ✅ TIER 3: FALLBACK (nếu cần)
+            Console.WriteLine($"⚠️ [RoomEventBroadcaster] No active connections found for room '{roomCode}'");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [RoomEventBroadcaster] Error in BroadcastToAllConnectionsAsync: {ex.Message}");
+        }
     }
     /// <summary>
     /// Broadcast message đến những người khác trong phòng (loại trừ userId được chỉ định)

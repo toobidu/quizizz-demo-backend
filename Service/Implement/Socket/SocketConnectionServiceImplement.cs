@@ -1,3 +1,4 @@
+using ConsoleApp1.Service.Interface;
 using ConsoleApp1.Service.Interface.Socket;
 using System.Collections.Concurrent;
 using System.Net;
@@ -7,6 +8,9 @@ using System.Text.Json;
 using System.Linq;
 using System.Text.RegularExpressions;
 using ConsoleApp1.Config;
+using ConsoleApp1.Model.Entity.Rooms;
+using ConsoleApp1.Repository.Interface;
+using System.Threading;
 
 namespace ConsoleApp1.Service.Implement.Socket;
 
@@ -16,86 +20,74 @@ namespace ConsoleApp1.Service.Implement.Socket;
 /// 2. Xử lý các kết nối WebSocket mới
 /// 3. Quản lý danh sách các kết nối đang hoạt động
 /// 4. Xử lý ping/pong để giữ kết nối sống
+/// 5. Broadcasting messages tới rooms/users/sockets
 /// </summary>
-public class SocketConnectionServiceImplement : ISocketConnectionService
+public class SocketConnectionServiceImplement : ConsoleApp1.Service.Interface.Socket.ISocketConnectionService, ConsoleApp1.Service.Interface.ISocketConnectionService
 {
-    // Dictionary lưu trữ tất cả các kết nối WebSocket hiện tại (shared)
     private readonly ConcurrentDictionary<string, WebSocket> _connections;
-    // Dictionary ánh xạ socketId với roomCode (shared)
     private readonly ConcurrentDictionary<string, string> _socketToRoom;
-    // Dictionary ánh xạ socketId với userId để track users
     private readonly ConcurrentDictionary<string, int> _socketToUserId;
-    // Dictionary theo dõi last pong time cho mỗi connection
     private readonly ConcurrentDictionary<string, DateTime> _lastPongReceived;
-    // HttpListener để lắng nghe các WebSocket request
     private HttpListener? _listener;
-    // Reference tới RoomManagementSocketService để xử lý joinRoom
     private IRoomManagementSocketService? _roomManagementService;
+    private IGameFlowSocketService? _gameFlowService;
+    private readonly ISocketConnectionRepository? _socketConnectionRepository;
+    private const int PONG_TIMEOUT_SECONDS = 180;
+    private const int PING_INTERVAL_SECONDS = 45;
+    private const int MAX_MISSED_PONGS = 3;
+    private readonly ConcurrentDictionary<string, int> _missedPongCounts = new();
+    private readonly List<Timer> _activeTimers = new();
 
-    // ✅ TĂNG PONG TIMEOUT LÊN 120 GIÂY
-    private const int PONG_TIMEOUT_SECONDS = 120;
-    private const int PING_INTERVAL_SECONDS = 30;
-
-    /// <summary>
-    /// Constructor nhận shared dictionaries
-    /// </summary>
     public SocketConnectionServiceImplement(
         ConcurrentDictionary<string, WebSocket> connections,
-        ConcurrentDictionary<string, string> socketToRoom)
+        ConcurrentDictionary<string, string> socketToRoom,
+        ISocketConnectionRepository? socketConnectionRepository = null)
     {
         _connections = connections;
         _socketToRoom = socketToRoom;
         _socketToUserId = new ConcurrentDictionary<string, int>();
         _lastPongReceived = new ConcurrentDictionary<string, DateTime>();
+        _socketConnectionRepository = socketConnectionRepository;
     }
 
-    /// <summary>
-    /// Constructor mặc định (backward compatibility)
-    /// </summary>
     public SocketConnectionServiceImplement()
     {
         _connections = new ConcurrentDictionary<string, WebSocket>();
         _socketToRoom = new ConcurrentDictionary<string, string>();
         _socketToUserId = new ConcurrentDictionary<string, int>();
         _lastPongReceived = new ConcurrentDictionary<string, DateTime>();
+        _socketConnectionRepository = null;
     }
 
-    /// <summary>
-    /// Thiết lập RoomManagementSocketService reference
-    /// </summary>
     public void SetRoomManagementService(IRoomManagementSocketService roomManagementService)
     {
         _roomManagementService = roomManagementService;
     }
 
-    /// <summary>
-    /// Khởi động WebSocket server trên port được chỉ định
-    /// </summary>
-    /// <param name="port">Port để lắng nghe WebSocket connections</param>
+    public void SetGameFlowService(IGameFlowSocketService gameFlowService)
+    {
+        _gameFlowService = gameFlowService;
+    }
+
     public async Task StartAsync(int port)
     {
-        // Khởi tạo HttpListener
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://localhost:{port}/");
         _listener.Start();
         
         Console.WriteLine($"🔌 [SocketConnectionService] WebSocket server started on port {port}");
 
-        // Chạy vòng lặp lắng nghe các connection mới trong background
         _ = Task.Run(async () =>
         {
             while (_listener.IsListening)
             {
                 try
                 {
-                    // Chờ connection mới
                     var context = await _listener.GetContextAsync();
-                    // Xử lý mỗi connection trong task riêng biệt
                     _ = Task.Run(() => HandleWebSocketRequestAsync(context));
                 }
                 catch (HttpListenerException)
                 {
-                    // Server đã dừng
                     Console.WriteLine("🛑 [SocketConnectionService] Server stopped listening");
                     break;
                 }
@@ -106,49 +98,118 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
             }
         });
 
-        // Đợi một chút để đảm bảo server đã start
         await Task.Delay(100);
     }
 
-    /// <summary>
-    /// Dừng WebSocket server và đóng tất cả kết nối
-    /// </summary>
     public async Task StopAsync()
     {
         Console.WriteLine("🛑 [SocketConnectionService] Stopping WebSocket server...");
         
-        // Đóng tất cả các kết nối WebSocket
-        foreach (var connection in _connections.Values)
+        foreach (var timer in _activeTimers.ToList())
         {
+            timer?.Dispose();
+        }
+        _activeTimers.Clear();
+        
+        var closeTasks = new List<Task>();
+        foreach (var kvp in _connections.ToList())
+        {
+            var socketId = kvp.Key;
+            var connection = kvp.Value;
+            
             if (connection.State == WebSocketState.Open)
             {
-                await connection.CloseAsync(WebSocketCloseStatus.NormalClosure, "Server shutdown", CancellationToken.None);
+                closeTasks.Add(CloseConnectionGracefully(socketId, connection, "Server shutdown"));
             }
         }
+        
+        try
+        {
+            await Task.WhenAll(closeTasks).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException)
+        {
+            Console.WriteLine("⚠️ [SocketConnectionService] Some connections failed to close within timeout");
+        }
+        
         _connections.Clear();
+        _socketToRoom.Clear();
+        _socketToUserId.Clear();
+        _lastPongReceived.Clear();
+        _missedPongCounts.Clear();
 
-        // Dừng HttpListener
-        _listener?.Stop();
-        _listener?.Close();
+        try
+        {
+            _listener?.Stop();
+            _listener?.Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ [SocketConnectionService] Error stopping listener: {ex.Message}");
+        }
         
         Console.WriteLine("✅ [SocketConnectionService] WebSocket server stopped");
     }
 
-    /// <summary>
-    /// Xử lý WebSocket request mới với validation
-    /// </summary>
+    private async Task CloseConnectionGracefully(string socketId, WebSocket connection, string reason)
+    {
+        try
+        {
+            Console.WriteLine($"🔌 [SocketConnectionService] Closing connection {socketId}: {reason}");
+            
+            if (_socketToRoom.TryGetValue(socketId, out var roomCode) && _roomManagementService != null)
+            {
+                await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+            }
+            
+            await connection.CloseAsync(
+                WebSocketCloseStatus.NormalClosure, 
+                reason, 
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ [SocketConnectionService] Error closing connection {socketId}: {ex.Message}");
+        }
+        finally
+        {
+            _connections.TryRemove(socketId, out _);
+            _socketToRoom.TryRemove(socketId, out _);
+            _socketToUserId.TryRemove(socketId, out _);
+            _lastPongReceived.TryRemove(socketId, out _);
+            _missedPongCounts.TryRemove(socketId, out _);
+        }
+    }
+
+    private bool IsValidWebSocketPath(string path)
+    {
+        return path == "/" || path.StartsWith("/waiting-room/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? ExtractRoomCodeFromPath(string path)
+    {
+        if (path.StartsWith("/waiting-room/", StringComparison.OrdinalIgnoreCase))
+        {
+            var roomCode = path.Substring("/waiting-room/".Length);
+            if (!string.IsNullOrEmpty(roomCode) && IsValidRoomCode(roomCode))
+            {
+                return roomCode;
+            }
+        }
+        return null;
+    }
+
     private async Task HandleWebSocketRequestAsync(HttpListenerContext context)
     {
         var clientIP = context.Request.RemoteEndPoint?.Address?.ToString() ?? "unknown";
         var path = context.Request.Url?.AbsolutePath ?? "/";
         var userAgent = context.Request.Headers["User-Agent"] ?? "unknown";
-        
+
         Console.WriteLine($"📡 [WebSocket] New request from {clientIP} to path: {path}");
         Console.WriteLine($"📡 [WebSocket] User-Agent: {userAgent}");
-        
+
         try
         {
-            // ✅ KIỂM TRA ĐÚNG WEBSOCKET REQUEST
             if (!context.Request.IsWebSocketRequest)
             {
                 Console.WriteLine($"❌ [WebSocket] Not a WebSocket request from {clientIP}");
@@ -158,7 +219,6 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            // ✅ VALIDATE URL PATH (optional - có thể skip nếu không cần)
             if (!IsValidWebSocketPath(path))
             {
                 Console.WriteLine($"❌ [WebSocket] Invalid path '{path}' from {clientIP}");
@@ -168,23 +228,20 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            // ✅ EXTRACT ROOMCODE TỪ PATH (nếu có pattern như /waiting-room/{roomCode})
             var roomCodeFromPath = ExtractRoomCodeFromPath(path);
             if (!string.IsNullOrEmpty(roomCodeFromPath))
             {
                 Console.WriteLine($"🏠 [WebSocket] Room code from path: {roomCodeFromPath}");
             }
 
-            // ✅ CHẤP NHẬN WEBSOCKET CONNECTION
             var webSocketContext = await context.AcceptWebSocketAsync(null);
             var webSocket = webSocketContext.WebSocket;
             var socketId = Guid.NewGuid().ToString();
 
             Console.WriteLine($"🔗 [WebSocket] Connection accepted: {socketId} from {clientIP}");
-            Console.WriteLine($"🔗 [WebSocket] Connection state: {webSocket.State}");
+            Console.WriteLine($"🔌 [WebSocket] Connection state: {webSocket.State}");
 
-            // Lưu metadata
-            var connectionInfo = new ConnectionMetadata 
+            var metadata = new ConnectionMetadata
             {
                 SocketId = socketId,
                 ClientIP = clientIP,
@@ -194,150 +251,87 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 UserAgent = userAgent
             };
 
-            // Lưu kết nối vào dictionary
-            _connections[socketId] = webSocket;
-
-            // Xử lý giao tiếp với client
-            await HandleWebSocketCommunication(webSocket, socketId, connectionInfo);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ [WebSocket] Error handling request from {clientIP}: {ex.Message}");
-            Console.WriteLine($"❌ [WebSocket] Stack trace: {ex.StackTrace}");
-            try
+            if (!_connections.TryAdd(socketId, webSocket))
             {
-                context.Response.StatusCode = 500;
-                await context.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes($"Server error: {ex.Message}"));
-                context.Response.Close();
+                Console.WriteLine($"⚠️ [WebSocket] Failed to add socket {socketId} to connections");
+                await webSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, "Failed to add connection", CancellationToken.None);
+                return;
             }
-            catch (Exception closeEx)
-            {
-                Console.WriteLine($"❌ [WebSocket] Error closing response: {closeEx.Message}");
-            }
-        }
-    }
 
-    /// <summary>
-    /// Validate WebSocket path
-    /// </summary>
-    private bool IsValidWebSocketPath(string path)
-    {
-        // Cho phép mọi path, hoặc implement logic cụ thể
-        var validPaths = new[] { "/", "/ws", "/websocket" };
-        var validPatterns = new[] { @"^/waiting-room/[A-Za-z0-9]+$" };
-        
-        // Check exact paths
-        if (validPaths.Contains(path.ToLower()))
-            return true;
-            
-        // Check patterns
-        foreach (var pattern in validPatterns)
-        {
-            if (Regex.IsMatch(path, pattern))
-                return true;
-        }
-        
-        // Allow all for now
-        return true;
-    }
+            var buffer = new byte[1024 * 4];
+            int messageCount = 0;
+            int pingCount = 0;
 
-    /// <summary>
-    /// Extract room code from path như /waiting-room/{roomCode}
-    /// </summary>
-    private string? ExtractRoomCodeFromPath(string path)
-    {
-        var match = Regex.Match(path, @"^/waiting-room/([A-Za-z0-9]+)$");
-        return match.Success ? match.Groups[1].Value : null;
-    }
-
-    /// <summary>
-    /// Enhanced WebSocket communication với better logging
-    /// </summary>
-    private async Task HandleWebSocketCommunication(WebSocket webSocket, string socketId, ConnectionMetadata metadata)
-    {
-        var buffer = new byte[1024 * 4];
-        var lastPongReceived = DateTime.UtcNow;
-        var pingCount = 0;
-        var messageCount = 0;
-
-        Console.WriteLine($"🔄 [WebSocket] Starting communication loop for {socketId}");
-
-        // ✅ ENHANCED PING TIMER với timeout detection
-        var pingTimer = new Timer(async _ =>
-        {
-            if (webSocket.State == WebSocketState.Open)
+            var cts = new CancellationTokenSource();
+            var pingTimer = new Timer(async state =>
             {
                 try
                 {
-                    pingCount++;
-                    
-                    // ✅ CHECK PONG TIMEOUT (120 seconds)
-                    var timeSinceLastPong = DateTime.UtcNow - lastPongReceived;
-                    if (timeSinceLastPong.TotalSeconds > PONG_TIMEOUT_SECONDS)
-                    {
-                        Console.WriteLine($"⏰ [WebSocket] Pong timeout for {socketId} ({timeSinceLastPong.TotalSeconds:F1}s)");
-                        Console.WriteLine($"🔌 [WebSocket] Closing connection {socketId} due to pong timeout");
-                        
-                        await webSocket.CloseAsync(
-                            WebSocketCloseStatus.PolicyViolation, 
-                            "Pong timeout", 
-                            CancellationToken.None
-                        );
+                    if (cts.Token.IsCancellationRequested)
                         return;
+
+                    pingCount++;
+                    var lastPongReceived = _lastPongReceived.GetOrAdd(socketId, DateTime.UtcNow);
+                    var timeSinceLastPong = DateTime.UtcNow - lastPongReceived;
+
+                    if (timeSinceLastPong.TotalSeconds > PING_INTERVAL_SECONDS * 2)
+                    {
+                        var missedCount = _missedPongCounts.GetOrAdd(socketId, 0) + 1;
+                        _missedPongCounts[socketId] = missedCount;
+
+                        if (missedCount >= MAX_MISSED_PONGS)
+                        {
+                            Console.WriteLine($"⏰ [WebSocket] Too many missed pongs for {socketId} ({missedCount}/{MAX_MISSED_PONGS})");
+                            await webSocket.CloseAsync(WebSocketCloseStatus.PolicyViolation, "Pong timeout", CancellationToken.None);
+                            cts.Cancel();
+                            return;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"⚠️ [WebSocket] Missed pong {missedCount}/{MAX_MISSED_PONGS} for {socketId} (last: {timeSinceLastPong.TotalSeconds:F1}s ago)");
+                        }
+                    }
+                    else
+                    {
+                        _missedPongCounts.TryRemove(socketId, out _);
                     }
 
                     var pingMessage = JsonSerializer.Serialize(new
                     {
                         type = "ping",
-                        data = new { 
+                        data = new
+                        {
                             timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                             pingCount = pingCount
                         },
                         timestamp = DateTime.UtcNow
                     });
-                    
+
                     var pingBuffer = Encoding.UTF8.GetBytes(pingMessage);
-                    await webSocket.SendAsync(pingBuffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                    
+                    await webSocket.SendAsync(new ArraySegment<byte>(pingBuffer), WebSocketMessageType.Text, true, cts.Token);
                     Console.WriteLine($"🏓 [WebSocket] Sent ping #{pingCount} to {socketId}");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"❌ [WebSocket] Error sending ping to {socketId}: {ex.Message}");
-                    Console.WriteLine($"🔌 [WebSocket] Will close connection {socketId} due to ping error");
+                    cts.Cancel();
                 }
-            }
-        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            }, null, TimeSpan.FromSeconds(PING_INTERVAL_SECONDS), TimeSpan.FromSeconds(PING_INTERVAL_SECONDS));
 
-        try
-        {
-            // ✅ MAIN COMMUNICATION LOOP với detailed logging
-            while (webSocket.State == WebSocketState.Open)
+            _activeTimers.Add(pingTimer);
+
+            try
             {
-                try
+                while (webSocket.State == WebSocketState.Open)
                 {
                     Console.WriteLine($"👂 [WebSocket] Waiting for message from {socketId}...");
-                    
                     var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    
                     Console.WriteLine($"📨 [WebSocket] Received from {socketId}: Type={result.MessageType}, Count={result.Count}, EndOfMessage={result.EndOfMessage}");
 
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
                         messageCount++;
                         var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        
-                        Console.WriteLine($"📥 [WebSocket] Message #{messageCount} from {socketId}: {message}");
-                        
-                        // Track pong responses và heartbeat
-                        if (message.Contains("\"type\":\"pong\"") || message.Contains("\"event\":\"pong\"") || 
-                            message.Contains("\"event\":\"heartbeat\"") || message.Contains("\"type\":\"heartbeat\""))
-                        {
-                            lastPongReceived = DateTime.UtcNow;
-                            _lastPongReceived[socketId] = DateTime.UtcNow;
-                            Console.WriteLine($"🏓 [WebSocket] Received pong/heartbeat from {socketId}");
-                        }
-                        
                         await ProcessWebSocketMessage(socketId, message);
                     }
                     else if (result.MessageType == WebSocketMessageType.Close)
@@ -351,99 +345,108 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                         Console.WriteLine($"📦 [WebSocket] Received binary data from {socketId} (not supported)");
                     }
                 }
-                catch (OperationCanceledException)
-                {
-                    Console.WriteLine($"⏹️ [WebSocket] Operation cancelled for {socketId}");
-                    break;
-                }
-                catch (WebSocketException wsEx)
-                {
-                    Console.WriteLine($"🔌 [WebSocket] WebSocket exception for {socketId}: {wsEx.Message}");
-                    Console.WriteLine($"🔌 [WebSocket] WebSocket error code: {wsEx.WebSocketErrorCode}");
-                    Console.WriteLine($"🔌 [WebSocket] Native error code: {wsEx.NativeErrorCode}");
-                    break;
-                }
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ [WebSocket] Unexpected error for {socketId}: {ex.Message}");
-            Console.WriteLine($"❌ [WebSocket] Exception type: {ex.GetType().Name}");
-            Console.WriteLine($"❌ [WebSocket] Stack trace: {ex.StackTrace}");
-        }
-        finally
-        {
-            // ✅ DETAILED CLEANUP LOGGING
-            var duration = DateTime.UtcNow - metadata.ConnectedAt;
-            Console.WriteLine($"🔌 [WebSocket] Connection {socketId} closing after {duration.TotalMinutes:F1} minutes");
-            Console.WriteLine($"📊 [WebSocket] Stats for {socketId}: {messageCount} messages, {pingCount} pings");
-            Console.WriteLine($"🔌 [WebSocket] Final state: {webSocket.State}");
-            
-            pingTimer?.Dispose();
-            _connections.TryRemove(socketId, out _);
-
-            // ✅ ENHANCED ROOM CLEANUP
-            if (_socketToRoom.TryGetValue(socketId, out var roomCode))
+            catch (OperationCanceledException)
             {
-                Console.WriteLine($"🚪 [WebSocket] Cleaning up room membership for {socketId} in room {roomCode}");
-                
-                try
+                Console.WriteLine($"⏹️ [WebSocket] Operation cancelled for {socketId}");
+            }
+            catch (WebSocketException wsEx)
+            {
+                Console.WriteLine($"🔌 [WebSocket] WebSocket exception for {socketId}: {wsEx.Message}");
+                Console.WriteLine($"🔌 [WebSocket] WebSocket error code: {wsEx.WebSocketErrorCode}");
+                Console.WriteLine($"🔌 [WebSocket] Native error code: {wsEx.NativeErrorCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [WebSocket] Unexpected error for {socketId}: {ex.Message}");
+                Console.WriteLine($"❌ [WebSocket] Exception type: {ex.GetType().Name}");
+                Console.WriteLine($"❌ [WebSocket] Stack trace: {ex.StackTrace}");
+            }
+            finally
+            {
+                cts.Cancel();
+                pingTimer?.Dispose();
+                _activeTimers.Remove(pingTimer);
+                var duration = DateTime.UtcNow - metadata.ConnectedAt;
+                Console.WriteLine($"🔌 [WebSocket] Connection {socketId} closing after {duration.TotalMinutes:F1} minutes");
+                Console.WriteLine($"📊 [WebSocket] Stats for {socketId}: {messageCount} messages, {pingCount} pings");
+                Console.WriteLine($"🔌 [WebSocket] Final state: {webSocket.State}");
+
+                _connections.TryRemove(socketId, out _);
+
+                if (_socketToRoom.TryGetValue(socketId, out var roomCode))
                 {
-                    if (_roomManagementService != null)
+                    Console.WriteLine($"🚪 [WebSocket] Cleaning up room membership for {socketId} in room {roomCode}");
+
+                    try
                     {
-                        var room = await _roomManagementService.GetRoomAsync(roomCode);
-                        if (room != null)
+                        if (_roomManagementService != null)
                         {
-                            var player = room.Players.FirstOrDefault(p => p.SocketId == socketId);
-                            if (player != null)
+                            var room = await _roomManagementService.GetRoomAsync(roomCode);
+                            if (room != null)
                             {
-                                Console.WriteLine($"🚪 [WebSocket] Player {player.Username} (ID: {player.UserId}) leaving room {roomCode} due to disconnect");
-                                await _roomManagementService.LeaveRoomByUserIdAsync(player.UserId, roomCode);
+                                var player = room.Players.FirstOrDefault(p => p.SocketId == socketId);
+                                if (player != null)
+                                {
+                                    Console.WriteLine($"🚪 [WebSocket] Player {player.Username} (ID: {player.UserId}) leaving room {roomCode} due to disconnect");
+                                    await _roomManagementService.LeaveRoomByUserIdAsync(player.UserId, roomCode);
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"⚠️ [WebSocket] Player not found in room {roomCode} for socket {socketId}");
+                                    await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+                                }
                             }
                             else
                             {
-                                Console.WriteLine($"⚠️ [WebSocket] Player not found in room {roomCode} for socket {socketId}");
-                                await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
+                                Console.WriteLine($"⚠️ [WebSocket] Room {roomCode} not found for socket {socketId}");
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"⚠️ [WebSocket] Room {roomCode} not found for socket {socketId}");
+                            Console.WriteLine($"❌ [WebSocket] RoomManagementService not available for cleanup");
                         }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"❌ [WebSocket] RoomManagementService not available for cleanup");
+                        Console.WriteLine($"❌ [WebSocket] Error during room cleanup for {socketId}: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _socketToRoom.TryRemove(socketId, out _);
+                        _socketToUserId.TryRemove(socketId, out _);
+                        _lastPongReceived.TryRemove(socketId, out _);
+
+                        try
+                        {
+                            if (_socketConnectionRepository != null)
+                            {
+                                await _socketConnectionRepository.DeleteBySocketIdAsync(socketId);
+                                Console.WriteLine($"🗑️ [WebSocket] Deleted SocketConnection for {socketId} from database");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ [WebSocket] Error deleting SocketConnection for {socketId}: {ex.Message}");
+                        }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ [WebSocket] Error during room cleanup for {socketId}: {ex.Message}");
-                }
-                finally
-                {
-                    _socketToRoom.TryRemove(socketId, out _);
-                    _socketToUserId.TryRemove(socketId, out _);
-                    _lastPongReceived.TryRemove(socketId, out _);
-                    Console.WriteLine($"🧹 [WebSocket] Removed socket-to-room and user mappings for {socketId}");
-                }
+
+                Console.WriteLine($"✅ [WebSocket] Cleanup completed for {socketId}");
             }
-            
-            Console.WriteLine($"✅ [WebSocket] Cleanup completed for {socketId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [WebSocket] Error handling WebSocket request from {clientIP}: {ex.Message}");
         }
     }
 
-    /// <summary>
-    /// Xử lý message nhận được từ WebSocket client
-    /// </summary>
     private async Task ProcessWebSocketMessage(string socketId, string message)
     {
         var startTime = DateTime.UtcNow;
-        
+
         try
         {
-            Console.WriteLine($"📥 [Message] Processing from {socketId}: {message}");
-
             if (string.IsNullOrWhiteSpace(message))
             {
                 Console.WriteLine($"⚠️ [Message] Empty message from {socketId}");
@@ -470,8 +473,7 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            var eventName = data.GetValueOrDefault("event")?.ToString() ?? data.GetValueOrDefault("type")?.ToString();
-            
+            var eventName = ExtractStringValue(data, "event") ?? ExtractStringValue(data, "type");
             if (string.IsNullOrEmpty(eventName))
             {
                 Console.WriteLine($"⚠️ [Message] Missing event name from {socketId}");
@@ -479,9 +481,10 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            Console.WriteLine($"🎯 [Message] Event '{eventName}' from {socketId}");
+            Console.WriteLine($"🎯 [Message] Processing event '{eventName}' from {socketId}");
 
-            // ✅ LOG VALIDATION CHO CÁC EVENTS QUAN TRỌNG
+            await UpdateLastActivity(socketId);
+
             switch (eventName.ToLower())
             {
                 case "join-room":
@@ -507,6 +510,8 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                     await HandlePingEvent(socketId);
                     break;
                 case "pong":
+                    _lastPongReceived[socketId] = DateTime.UtcNow;
+                    _missedPongCounts.TryRemove(socketId, out _);
                     Console.WriteLine($"🏓 [Message] Pong received from {socketId}");
                     break;
                 case "heartbeat":
@@ -520,7 +525,7 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                     await SendAckResponse(socketId, eventName, false, "Event not supported");
                     break;
             }
-            
+
             var duration = DateTime.UtcNow - startTime;
             Console.WriteLine($"✅ [Message] Processed '{eventName}' in {duration.TotalMilliseconds:F1}ms");
         }
@@ -528,35 +533,20 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         {
             var duration = DateTime.UtcNow - startTime;
             Console.WriteLine($"❌ [Message] Error processing message from {socketId} after {duration.TotalMilliseconds:F1}ms: {ex.Message}");
-            Console.WriteLine($"❌ [Message] Exception type: {ex.GetType().Name}");
-            Console.WriteLine($"❌ [Message] Stack trace: {ex.StackTrace}");
-            
-            try
-            {
-                await SendAckResponse(socketId, "unknown", false, "Internal server error");
-            }
-            catch (Exception ackEx)
-            {
-                Console.WriteLine($"❌ [Message] Failed to send error ACK to {socketId}: {ackEx.Message}");
-            }
+            await SendAckResponse(socketId, "unknown", false, "Internal server error");
         }
     }
 
-    /// <summary>
-    /// Validate và handle join-room với enhanced logging
-    /// </summary>
     private async Task ValidateAndHandleJoinRoom(string socketId, Dictionary<string, object> data, string eventName)
     {
         Console.WriteLine($"🚪 [JoinRoom] Processing join-room from {socketId}");
         
-        // Extract data với validation
         var roomCode = ExtractStringValue(data, "roomCode");
         var username = ExtractStringValue(data, "username"); 
         var userIdStr = ExtractStringValue(data, "userId");
         
         Console.WriteLine($"🚪 [JoinRoom] Data - roomCode: {roomCode}, username: {username}, userId: {userIdStr}");
         
-        // Validation
         if (string.IsNullOrWhiteSpace(roomCode))
         {
             Console.WriteLine($"❌ [JoinRoom] Missing roomCode from {socketId}");
@@ -571,14 +561,13 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
             return;
         }
         
-        if (!int.TryParse(userIdStr, out var userId))
+        if (!int.TryParse(userIdStr, out var userId) || userId <= 0)
         {
             Console.WriteLine($"❌ [JoinRoom] Invalid userId '{userIdStr}' from {socketId}");
             await SendAckResponse(socketId, eventName, false, "Invalid user ID");
             return;
         }
         
-        // ✅ VALIDATE ROOMCODE FORMAT
         if (!IsValidRoomCode(roomCode))
         {
             Console.WriteLine($"❌ [JoinRoom] Invalid roomCode format '{roomCode}' from {socketId}");
@@ -591,141 +580,141 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         await HandleJoinRoomEvent(socketId, data);
     }
 
-    /// <summary>
-    /// Validate room code format
-    /// </summary>
     private bool IsValidRoomCode(string roomCode)
     {
         if (string.IsNullOrWhiteSpace(roomCode)) return false;
         if (roomCode.Length < RoomManagementConstants.Limits.MinRoomCodeLength) return false;
         if (roomCode.Length > RoomManagementConstants.Limits.MaxRoomCodeLength) return false;
         
-        // Chỉ cho phép alphanumeric
         return roomCode.All(char.IsLetterOrDigit);
     }
 
-    /// <summary>
-    /// Extract string value với fallback cho nested data
-    /// </summary>
     private string? ExtractStringValue(Dictionary<string, object> data, string key)
     {
-        // Direct key
         var directValue = data.GetValueOrDefault(key)?.ToString();
-        if (!string.IsNullOrEmpty(directValue)) return directValue;
+        if (!string.IsNullOrEmpty(directValue)) 
+        {
+            Console.WriteLine($"🔍 [ExtractStringValue] Found '{key}' direct: '{directValue}'");
+            return directValue;
+        }
         
-        // Nested trong "data"
         if (data.ContainsKey("data"))
         {
             try
             {
-                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
-                return nestedData?.GetValueOrDefault(key)?.ToString();
+                var dataValueStr = data["data"].ToString();
+                Console.WriteLine($"🔍 [ExtractStringValue] Checking nested data: {dataValueStr}");
+                
+                if (!string.IsNullOrEmpty(dataValueStr))
+                {
+                    var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(dataValueStr);
+                    if (nestedData != null)
+                    {
+                        var nestedValue = nestedData.GetValueOrDefault(key)?.ToString();
+                        if (!string.IsNullOrEmpty(nestedValue))
+                        {
+                            Console.WriteLine($"🔍 [ExtractStringValue] Found '{key}' nested: '{nestedValue}'");
+                            return nestedValue;
+                        }
+                    }
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                Console.WriteLine($"❌ [ExtractStringValue] Error parsing nested data for '{key}': {ex.Message}");
             }
         }
         
+        Console.WriteLine($"⚠️ [ExtractStringValue] Key '{key}' not found in data");
         return null;
     }
 
-    /// <summary>
-    /// Xử lý event join-room từ WebSocket client
-    /// </summary>
     private async Task HandleJoinRoomEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"🚪 [SocketConnectionService] join-room received from {socketId}");
             
-            // Lấy thông tin từ message - kiểm tra cả direct và nested trong "data"
-            string? roomCode = null;
-            string? username = null;
-            string? userIdStr = null;
+            var roomCode = ExtractStringValue(data, "roomCode");
+            var username = ExtractStringValue(data, "username");
+            var userIdStr = ExtractStringValue(data, "userId");
 
-            // Kiểm tra direct fields trước
-            roomCode = data.GetValueOrDefault("roomCode")?.ToString();
-            username = data.GetValueOrDefault("username")?.ToString();
-            userIdStr = data.GetValueOrDefault("userId")?.ToString();
-
-            // Nếu không có, kiểm tra trong "data" nested
-            if (string.IsNullOrEmpty(roomCode) && data.ContainsKey("data"))
-            {
-                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
-                if (nestedData != null)
-                {
-                    roomCode = nestedData.GetValueOrDefault("roomCode")?.ToString();
-                    username = nestedData.GetValueOrDefault("username")?.ToString();
-                    userIdStr = nestedData.GetValueOrDefault("userId")?.ToString();
-                }
-            }
+            Console.WriteLine($"🚪 [HandleJoinRoom] Extracted - roomCode: '{roomCode}', username: '{username}', userId: '{userIdStr}'");
 
             if (string.IsNullOrEmpty(roomCode))
             {
+                Console.WriteLine($"❌ [HandleJoinRoom] Missing roomCode from {socketId}");
                 await SendAckResponse(socketId, "join-room", false, "Missing room code");
                 return;
             }
 
-            // Nếu không có username/userId, cần lấy từ session hoặc từ database
-            if (string.IsNullOrEmpty(username) || !int.TryParse(userIdStr, out var userId))
+            if (string.IsNullOrEmpty(username))
             {
-                await SendAckResponse(socketId, "join-room", false, "Missing username or invalid userId");
+                Console.WriteLine($"❌ [HandleJoinRoom] Missing username from {socketId}");
+                await SendAckResponse(socketId, "join-room", false, "Missing username");
                 return;
             }
 
-            // Lưu mapping socketId -> roomCode và socketId -> userId
+            if (!int.TryParse(userIdStr, out var userId) || userId <= 0)
+            {
+                Console.WriteLine($"❌ [HandleJoinRoom] Invalid userId '{userIdStr}' from {socketId}");
+                await SendAckResponse(socketId, "join-room", false, "Invalid user ID");
+                return;
+            }
+
             _socketToRoom[socketId] = roomCode;
             _socketToUserId[socketId] = userId;
 
-            // Sử dụng shared RoomManagementSocketService
-            if (_roomManagementService != null)
+            Console.WriteLine($"✅ [HandleJoinRoom] Validation passed. Proceeding with room join for {username} (ID: {userId}) to room {roomCode}");
+
+            if (_roomManagementService == null)
             {
-                await _roomManagementService.JoinRoomAsync(socketId, roomCode, username, userId);
-                await SendAckResponse(socketId, "join-room", true, "Successfully joined room");
-                
-                Console.WriteLine($"✅ [SocketConnectionService] {username} joined room {roomCode}");
-                
-                // Gửi sự kiện players-updated sau khi join thành công
-                try
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService is not initialized");
+                await SendAckResponse(socketId, "join-room", false, "Room service not available");
+                return;
+            }
+
+            Console.WriteLine($"🎮 [HandleJoinRoom] Calling RoomManagementService.JoinRoomAsync...");
+            await _roomManagementService.JoinRoomAsync(socketId, roomCode, username, userId);
+            
+            Console.WriteLine($"💾 [HandleJoinRoom] Creating socket connection in database...");
+            await CreateSocketConnectionInDatabase(socketId, userId, roomCode);
+            
+            await SendAckResponse(socketId, "join-room", true, "Successfully joined room");
+            
+            Console.WriteLine($"✅ [SocketConnectionService] {username} joined room {roomCode}");
+            
+            try
+            {
+                var room = await _roomManagementService.GetRoomAsync(roomCode);
+                if (room != null)
                 {
-                    var room = await _roomManagementService.GetRoomAsync(roomCode);
-                    if (room != null)
+                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-joined", new
                     {
-                        // Broadcast player-joined event
-                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-joined", new
-                        {
-                            userId = userId,
-                            username = username,
-                            isHost = room.Players.Any(p => p.UserId == userId && p.IsHost),
-                            roomCode = roomCode,
-                            timestamp = DateTime.UtcNow
-                        });
-                        
-                        // Broadcast players-updated event để đồng bộ danh sách
-                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
-                        {
-                            players = room.Players.Select(p => new { 
-                                userId = p.UserId, 
-                                username = p.Username, 
-                                isHost = p.IsHost,
-                                status = p.Status ?? "waiting"
-                            }).ToList(),
-                            roomCode = roomCode
-                        });
-                        
-                        Console.WriteLine($"📡 [SocketConnectionService] Broadcasted player-joined and players-updated for {username} in room {roomCode}");
-                    }
-                }
-                catch (Exception broadcastEx)
-                {
-                    Console.WriteLine($"❌ [SocketConnectionService] Error broadcasting join events: {broadcastEx.Message}");
+                        userId = userId,
+                        username = username,
+                        isHost = room.Players.Any(p => p.UserId == userId && p.IsHost),
+                        roomCode = roomCode,
+                        timestamp = DateTime.UtcNow
+                    });
+                    
+                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
+                    {
+                        players = room.Players.Select(p => new { 
+                            userId = p.UserId, 
+                            username = p.Username, 
+                            isHost = p.IsHost,
+                            status = p.Status ?? "waiting"
+                        }).ToList(),
+                        roomCode = roomCode
+                    });
+                    
+                    Console.WriteLine($"📡 [SocketConnectionService] Broadcasted player-joined and players-updated for {username} in room {roomCode}");
                 }
             }
-            else
+            catch (Exception broadcastEx)
             {
-                await SendAckResponse(socketId, "join-room", false, "Room service not available");
-                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService not available");
+                Console.WriteLine($"❌ [SocketConnectionService] Error broadcasting join events: {broadcastEx.Message}");
             }
         }
         catch (Exception ex)
@@ -735,35 +724,15 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý event leave-room từ WebSocket client
-    /// </summary>
     private async Task HandleLeaveRoomEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"🚪 [SocketConnectionService] leave-room received from {socketId}");
             
-            // Lấy thông tin từ message - kiểm tra cả direct và nested trong "data"
-            string? roomCode = null;
-            string? userIdStr = null;
+            string? roomCode = ExtractStringValue(data, "roomCode");
+            string? userIdStr = ExtractStringValue(data, "userId");
 
-            // Kiểm tra direct fields trước
-            roomCode = data.GetValueOrDefault("roomCode")?.ToString();
-            userIdStr = data.GetValueOrDefault("userId")?.ToString();
-
-            // Nếu không có, kiểm tra trong "data" nested
-            if ((string.IsNullOrEmpty(roomCode) || string.IsNullOrEmpty(userIdStr)) && data.ContainsKey("data"))
-            {
-                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
-                if (nestedData != null)
-                {
-                    roomCode = roomCode ?? nestedData.GetValueOrDefault("roomCode")?.ToString();
-                    userIdStr = userIdStr ?? nestedData.GetValueOrDefault("userId")?.ToString();
-                }
-            }
-
-            // Nếu vẫn không có roomCode, thử lấy từ mapping
             if (string.IsNullOrEmpty(roomCode))
             {
                 if (!_socketToRoom.TryGetValue(socketId, out roomCode))
@@ -773,64 +742,58 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 }
             }
 
-            // Kiểm tra xem socket có thực sự đang ở trong phòng không
             if (!_socketToRoom.TryGetValue(socketId, out var currentRoom) || currentRoom != roomCode)
             {
                 await SendAckResponse(socketId, "leave-room", false, "Not in specified room");
                 return;
             }
 
-            // Sử dụng shared RoomManagementSocketService
-            if (_roomManagementService != null)
+            if (_roomManagementService == null)
             {
-                // Nếu có userId, sử dụng LeaveRoomByUserIdAsync để đảm bảo xóa người chơi khỏi database
-                if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
-                {
-                    await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
-                }
-                else
-                {
-                    await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
-                }
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService is not initialized");
+                await SendAckResponse(socketId, "leave-room", false, "Room service not available");
+                return;
+            }
 
-                // Xóa mapping
-                _socketToRoom.TryRemove(socketId, out _);
-                _socketToUserId.TryRemove(socketId, out _);
-
-                await SendAckResponse(socketId, "leave-room", true, "Successfully left room");
-                
-                // Gửi players-updated event sau khi leave
-                try
-                {
-                    var room = await _roomManagementService.GetRoomAsync(roomCode);
-                    if (room != null)
-                    {
-                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
-                        {
-                            players = room.Players.Select(p => new { 
-                                userId = p.UserId, 
-                                username = p.Username, 
-                                isHost = p.IsHost,
-                                status = p.Status ?? "waiting"
-                            }).ToList(),
-                            roomCode = roomCode
-                        });
-                        
-                        Console.WriteLine($"📡 [SocketConnectionService] Broadcasted players-updated after leave in room {roomCode}");
-                    }
-                }
-                catch (Exception broadcastEx)
-                {
-                    Console.WriteLine($"❌ [SocketConnectionService] Error broadcasting leave events: {broadcastEx.Message}");
-                }
-                
-                Console.WriteLine($"✅ [SocketConnectionService] Socket {socketId} left room {roomCode}");
+            if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+            {
+                await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
             }
             else
             {
-                await SendAckResponse(socketId, "leave-room", false, "Room service not available");
-                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService not available");
+                await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
             }
+
+            _socketToRoom.TryRemove(socketId, out _);
+            _socketToUserId.TryRemove(socketId, out _);
+
+            await SendAckResponse(socketId, "leave-room", true, "Successfully left room");
+            
+            try
+            {
+                var room = await _roomManagementService.GetRoomAsync(roomCode);
+                if (room != null)
+                {
+                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
+                    {
+                        players = room.Players.Select(p => new { 
+                            userId = p.UserId, 
+                            username = p.Username, 
+                            isHost = p.IsHost,
+                            status = p.Status ?? "waiting"
+                        }).ToList(),
+                        roomCode = roomCode
+                    });
+                    
+                    Console.WriteLine($"📡 [SocketConnectionService] Broadcasted players-updated after leave in room {roomCode}");
+                }
+            }
+            catch (Exception broadcastEx)
+            {
+                Console.WriteLine($"❌ [SocketConnectionService] Error broadcasting leave events: {broadcastEx.Message}");
+            }
+            
+            Console.WriteLine($"✅ [SocketConnectionService] Socket {socketId} left room {roomCode}");
         }
         catch (Exception ex)
         {
@@ -839,32 +802,14 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý event request-players-update từ WebSocket client
-    /// </summary>
     private async Task HandleRequestPlayersUpdateEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"🔄 [SocketConnectionService] request-players-update received from {socketId}");
 
-            // Lấy thông tin từ message - kiểm tra cả direct và nested trong "data"
-            string? roomCode = null;
+            string? roomCode = ExtractStringValue(data, "roomCode");
 
-            // Kiểm tra direct fields trước
-            roomCode = data.GetValueOrDefault("roomCode")?.ToString();
-
-            // Nếu không có, kiểm tra trong "data" nested
-            if (string.IsNullOrEmpty(roomCode) && data.ContainsKey("data"))
-            {
-                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
-                if (nestedData != null)
-                {
-                    roomCode = nestedData.GetValueOrDefault("roomCode")?.ToString();
-                }
-            }
-
-            // Nếu vẫn không có roomCode, thử lấy từ mapping
             if (string.IsNullOrEmpty(roomCode))
             {
                 _socketToRoom.TryGetValue(socketId, out roomCode);
@@ -876,17 +821,15 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            // Sử dụng shared RoomManagementSocketService
-            if (_roomManagementService != null)
+            if (_roomManagementService == null)
             {
-                await _roomManagementService.RequestPlayersUpdateAsync(socketId, roomCode);
-                await SendAckResponse(socketId, "request-players-update", true, "Players update sent");
-            }
-            else
-            {
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService is not initialized");
                 await SendAckResponse(socketId, "request-players-update", false, "Room service not available");
-                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService not available");
+                return;
             }
+
+            await _roomManagementService.RequestPlayersUpdateAsync(socketId, roomCode);
+            await SendAckResponse(socketId, "request-players-update", true, "Players update sent");
         }
         catch (Exception ex)
         {
@@ -895,16 +838,12 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý ping event từ client để maintain connection
-    /// </summary>
     private async Task HandlePingEvent(string socketId)
     {
         try
         {
             Console.WriteLine($"🏓 [SocketConnectionService] Ping received from {socketId}");
             
-            // Send pong response
             var pongResponse = new
             {
                 type = "pong",
@@ -921,19 +860,14 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý heartbeat event từ client để maintain connection
-    /// </summary>
     private async Task HandleHeartbeatEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"💓 [SocketConnectionService] Heartbeat received from {socketId}");
             
-            // Cập nhật last heartbeat time
             _lastPongReceived[socketId] = DateTime.UtcNow;
             
-            // Send heartbeat response với status ok
             var heartbeatResponse = new
             {
                 @event = "heartbeat",
@@ -955,21 +889,16 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý player-left event từ client
-    /// </summary>
     private async Task HandlePlayerLeftEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"🚪 [SocketConnectionService] player-left received from {socketId}");
             
-            // Lấy thông tin từ message
             var roomCode = ExtractStringValue(data, "roomCode");
             var userIdStr = ExtractStringValue(data, "userId");
             var username = ExtractStringValue(data, "username");
             
-            // Nếu không có roomCode, lấy từ mapping
             if (string.IsNullOrEmpty(roomCode))
             {
                 _socketToRoom.TryGetValue(socketId, out roomCode);
@@ -983,55 +912,50 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
             
             Console.WriteLine($"🚪 [SocketConnectionService] Processing player-left: roomCode={roomCode}, userId={userIdStr}, username={username}");
             
-            if (_roomManagementService != null)
+            if (_roomManagementService == null)
             {
-                // Nếu có userId, sử dụng để xóa player khỏi database
-                if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService is not initialized");
+                await SendAckResponse(socketId, "player-left", false, "Room service not available");
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+            {
+                await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
+                
+                await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-left", new
                 {
-                    await _roomManagementService.LeaveRoomByUserIdAsync(userId, roomCode);
-                    
-                    // Broadcast player-left event cho các players khác
-                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-left", new
+                    userId = userId,
+                    username = username ?? "Unknown",
+                    roomCode = roomCode,
+                    timestamp = DateTime.UtcNow
+                });
+                
+                var room = await _roomManagementService.GetRoomAsync(roomCode);
+                if (room != null)
+                {
+                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
                     {
-                        userId = userId,
-                        username = username ?? "Unknown",
-                        roomCode = roomCode,
-                        timestamp = DateTime.UtcNow
+                        players = room.Players.Select(p => new { 
+                            userId = p.UserId, 
+                            username = p.Username, 
+                            isHost = p.IsHost,
+                            status = p.Status
+                        }).ToList(),
+                        roomCode = roomCode
                     });
-                    
-                    // Gửi players-updated event để đồng bộ danh sách
-                    var room = await _roomManagementService.GetRoomAsync(roomCode);
-                    if (room != null)
-                    {
-                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "players-updated", new
-                        {
-                            players = room.Players.Select(p => new { 
-                                userId = p.UserId, 
-                                username = p.Username, 
-                                isHost = p.IsHost,
-                                status = p.Status
-                            }).ToList(),
-                            roomCode = roomCode
-                        });
-                    }
                 }
-                else
-                {
-                    await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
-                }
-                
-                // Xóa mapping
-                _socketToRoom.TryRemove(socketId, out _);
-                _socketToUserId.TryRemove(socketId, out _);
-                
-                await SendAckResponse(socketId, "player-left", true, "Player left successfully");
-                Console.WriteLine($"✅ [SocketConnectionService] Player left room {roomCode} successfully");
             }
             else
             {
-                await SendAckResponse(socketId, "player-left", false, "Room service not available");
-                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService not available");
+                await _roomManagementService.LeaveRoomAsync(socketId, roomCode);
             }
+            
+            _socketToRoom.TryRemove(socketId, out _);
+            _socketToUserId.TryRemove(socketId, out _);
+            
+            await SendAckResponse(socketId, "player-left", true, "Player left successfully");
+            Console.WriteLine($"✅ [SocketConnectionService] Player left room {roomCode} successfully");
         }
         catch (Exception ex)
         {
@@ -1040,112 +964,74 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý event start-game từ WebSocket client
-    /// </summary>
     private async Task HandleStartGameEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"🎮 [SocketConnectionService] start-game received from {socketId}");
-            
-            // Lấy thông tin từ message - kiểm tra cả direct và nested trong "data"
-            string? roomCode = null;
-            string? hostUserIdStr = null;
-            
-            // Kiểm tra direct fields trước
-            roomCode = data.GetValueOrDefault("roomCode")?.ToString();
-            hostUserIdStr = data.GetValueOrDefault("hostUserId")?.ToString();
-            
-            // Nếu không có, kiểm tra trong "data" nested
-            if (string.IsNullOrEmpty(roomCode) && data.ContainsKey("data"))
-            {
-                var nestedData = JsonSerializer.Deserialize<Dictionary<string, object>>(data["data"].ToString() ?? "{}");
-                if (nestedData != null)
-                {
-                    roomCode = roomCode ?? nestedData.GetValueOrDefault("roomCode")?.ToString();
-                    hostUserIdStr = hostUserIdStr ?? nestedData.GetValueOrDefault("hostUserId")?.ToString();
-                }
-            }
-            
-            // Nếu vẫn không có roomCode, thử lấy từ mapping
+            Console.WriteLine($"🎮 [SocketConnectionService] Request data: {JsonSerializer.Serialize(data)}");
+
+            string? roomCode = ExtractStringValue(data, "roomCode");
+            string? hostUserIdStr = ExtractStringValue(data, "hostUserId") ?? ExtractStringValue(data, "userId");
+
             if (string.IsNullOrEmpty(roomCode))
             {
                 _socketToRoom.TryGetValue(socketId, out roomCode);
+                Console.WriteLine($"🔍 [SocketConnectionService] Got roomCode from mapping: {roomCode}");
             }
-            
+
             if (string.IsNullOrEmpty(roomCode) || !int.TryParse(hostUserIdStr, out var hostUserId))
             {
-                Console.WriteLine($"❌ [SocketConnectionService] Invalid start-game data: roomCode={roomCode}, hostUserId={hostUserIdStr}");
+                Console.WriteLine($"❌ [SocketConnectionService] Invalid start-game data: roomCode='{roomCode}', hostUserId='{hostUserIdStr}'");
                 await SendAckResponse(socketId, "start-game", false, "Invalid room code or host user ID");
                 return;
             }
-            
+
             Console.WriteLine($"🔍 [SocketConnectionService] Processing start-game for room: {roomCode}, host: {hostUserId}");
-            
-            if (_roomManagementService != null)
+
+            if (_roomManagementService == null)
             {
-                var room = await _roomManagementService.GetRoomAsync(roomCode);
-                if (room == null)
-                {
-                    Console.WriteLine($"❌ [SocketConnectionService] Room {roomCode} not found");
-                    await SendAckResponse(socketId, "start-game", false, "Room not found");
-                    return;
-                }
-                
-                var hostPlayer = room.Players.FirstOrDefault(p => p.UserId == hostUserId && p.IsHost);
-                if (hostPlayer == null)
-                {
-                    Console.WriteLine($"❌ [SocketConnectionService] User {hostUserId} is not host of room {roomCode}");
-                    await SendAckResponse(socketId, "start-game", false, "Unauthorized: Only host can start game");
-                    return;
-                }
-                
-                if (room.Players.Count < 1)
-                {
-                    Console.WriteLine($"❌ [SocketConnectionService] Not enough players in room {roomCode}");
-                    await SendAckResponse(socketId, "start-game", false, "Need at least 1 player to start game");
-                    return;
-                }
-                
-                Console.WriteLine($"✅ [SocketConnectionService] Room validation passed. Players in room: {room.Players.Count}");
-                
-                // ✅ GỬI ACK THÀNH CÔNG CHO HOST TRƯỚC
-                await SendAckResponse(socketId, "start-game", true, "Game starting...");
-                
-                var gameStartData = new
-                {
-                    roomCode = roomCode,
-                    gameData = new
-                    {
-                        roomCode = roomCode,
-                        selectedTopicIds = data.GetValueOrDefault("selectedTopicIds") ?? new List<int>(),
-                        questionCount = data.GetValueOrDefault("questionCount") ?? 10,
-                        timeLimit = data.GetValueOrDefault("timeLimit") ?? 30,
-                        hostUserId = hostUserId,
-                        startTime = DateTime.UtcNow.ToString("O"),
-                        players = room.Players.Select(p => new { 
-                            userId = p.UserId, 
-                            username = p.Username, 
-                            isHost = p.IsHost 
-                        }).ToList()
-                    }
-                };
-                
-                // Broadcast game-started event
-                await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "game-started", gameStartData);
-                
-                Console.WriteLine($"📡 [SocketConnectionService] game-started broadcasted to room {roomCode}");
-                Console.WriteLine($"📡 [SocketConnectionService] Players notified: {string.Join(",", room.Players.Select(p => p.Username))}");
-                
-                // Cập nhật game state ở backend
-                room.GameState = "starting";
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService is not initialized");
+                await SendAckResponse(socketId, "start-game", false, "Room service not available");
+                return;
             }
-            else
+
+            var room = await _roomManagementService.GetRoomAsync(roomCode);
+            if (room == null)
             {
-                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService not available");
-                await SendAckResponse(socketId, "start-game", false, "Service not available");
+                Console.WriteLine($"❌ [SocketConnectionService] Room {roomCode} not found");
+                await SendAckResponse(socketId, "start-game", false, "Room not found");
+                return;
             }
+
+            var hostPlayer = room.Players.FirstOrDefault(p => p.UserId == hostUserId && p.IsHost);
+            if (hostPlayer == null)
+            {
+                Console.WriteLine($"❌ [SocketConnectionService] User {hostUserId} is not host of room {roomCode}");
+                await SendAckResponse(socketId, "start-game", false, "Unauthorized: Only host can start game");
+                return;
+            }
+
+            if (room.Players.Count < 1)
+            {
+                Console.WriteLine($"❌ [SocketConnectionService] Not enough players in room {roomCode}");
+                await SendAckResponse(socketId, "start-game", false, "Need at least 1 player to start game");
+                return;
+            }
+
+            Console.WriteLine($"✅ [SocketConnectionService] Room validation passed. Players in room: {room.Players.Count}");
+
+            await SendAckResponse(socketId, "start-game", true, "Game starting...");
+
+            if (_gameFlowService == null)
+            {
+                Console.WriteLine($"❌ [SocketConnectionService] GameFlowService is not initialized");
+                await SendAckResponse(socketId, "start-game", false, "Game service not available");
+                return;
+            }
+
+            await _gameFlowService.StartGameAsync(roomCode);
+            Console.WriteLine($"🎮 [SocketConnectionService] Started game flow for room {roomCode}");
         }
         catch (Exception ex)
         {
@@ -1154,19 +1040,15 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Xử lý player ready event
-    /// </summary>
     private async Task HandlePlayerReadyEvent(string socketId, Dictionary<string, object> data)
     {
         try
         {
             Console.WriteLine($"🎯 [SocketConnectionService] player-ready received from {socketId}");
 
-            var roomCode = data.GetValueOrDefault("roomCode")?.ToString();
-            var userIdStr = data.GetValueOrDefault("userId")?.ToString();
+            var roomCode = ExtractStringValue(data, "roomCode");
+            var userIdStr = ExtractStringValue(data, "userId");
 
-            // Nếu không có roomCode, lấy từ mapping
             if (string.IsNullOrEmpty(roomCode))
             {
                 _socketToRoom.TryGetValue(socketId, out roomCode);
@@ -1178,41 +1060,46 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 return;
             }
 
-            if (_roomManagementService != null && int.TryParse(userIdStr, out var userId))
+            if (_roomManagementService == null)
             {
-                var room = await _roomManagementService.GetRoomAsync(roomCode);
-                if (room != null)
+                Console.WriteLine($"❌ [SocketConnectionService] RoomManagementService is not initialized");
+                await SendAckResponse(socketId, "player-ready", false, "Room service not available");
+                return;
+            }
+
+            if (!int.TryParse(userIdStr, out var userId))
+            {
+                await SendAckResponse(socketId, "player-ready", false, "Invalid userId");
+                return;
+            }
+
+            var room = await _roomManagementService.GetRoomAsync(roomCode);
+            if (room != null)
+            {
+                var player = room.Players.FirstOrDefault(p => p.UserId == userId);
+                if (player != null)
                 {
-                    var player = room.Players.FirstOrDefault(p => p.UserId == userId);
-                    if (player != null)
-                    {
-                        player.Status = "ready";
+                    player.Status = "ready";
 
-                        // Broadcast player ready status
-                        await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-status-updated", new
-                        {
-                            userId = userId,
-                            username = player.Username,
-                            status = "ready",
-                            roomCode = roomCode
-                        });
-
-                        await SendAckResponse(socketId, "player-ready", true, "Player marked as ready");
-                        Console.WriteLine($"✅ [SocketConnectionService] Player {userId} marked as ready in room {roomCode}");
-                    }
-                    else
+                    await _roomManagementService.BroadcastToAllConnectionsAsync(roomCode, "player-status-updated", new
                     {
-                        await SendAckResponse(socketId, "player-ready", false, "Player not found in room");
-                    }
+                        userId = userId,
+                        username = player.Username,
+                        status = "ready",
+                        roomCode = roomCode
+                    });
+
+                    await SendAckResponse(socketId, "player-ready", true, "Player marked as ready");
+                    Console.WriteLine($"✅ [SocketConnectionService] Player {userId} marked as ready in room {roomCode}");
                 }
                 else
                 {
-                    await SendAckResponse(socketId, "player-ready", false, "Room not found");
+                    await SendAckResponse(socketId, "player-ready", false, "Player not found in room");
                 }
             }
             else
             {
-                await SendAckResponse(socketId, "player-ready", false, "Invalid data or service unavailable");
+                await SendAckResponse(socketId, "player-ready", false, "Room not found");
             }
         }
         catch (Exception ex)
@@ -1222,9 +1109,6 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Gửi ACK response về cho client
-    /// </summary>
     private async Task SendAckResponse(string socketId, string eventType, bool success, string message)
     {
         try
@@ -1240,14 +1124,8 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
                 timestamp = DateTime.UtcNow
             };
             
-            var responseJson = JsonSerializer.Serialize(response);
-            var responseBuffer = Encoding.UTF8.GetBytes(responseJson);
-            
-            if (_connections.TryGetValue(socketId, out var socket) && socket.State == WebSocketState.Open)
-            {
-                await socket.SendAsync(responseBuffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                Console.WriteLine($"📤 [SocketConnectionService] Sent {(success ? "ACK" : "ERROR")} for {eventType} to {socketId}: {message}");
-            }
+            await SendMessageToSocketAsync(socketId, response);
+            Console.WriteLine($"📤 [SocketConnectionService] Sent {(success ? "ACK" : "ERROR")} for {eventType} to {socketId}: {message}");
         }
         catch (Exception ex)
         {
@@ -1255,25 +1133,26 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Gửi message đến một socket cụ thể
-    /// </summary>
     private async Task SendMessageToSocketAsync(string socketId, object message)
     {
         try
         {
-            if (_connections.TryGetValue(socketId, out var socket) && socket.State == WebSocketState.Open)
+            if (!_connections.TryGetValue(socketId, out var socket))
             {
-                var messageJson = JsonSerializer.Serialize(message);
-                var messageBuffer = Encoding.UTF8.GetBytes(messageJson);
-                
-                await socket.SendAsync(messageBuffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                Console.WriteLine($"📤 [SocketConnectionService] Sent message to {socketId}");
+                Console.WriteLine($"⚠️ [SocketConnectionService] Socket {socketId} not found in _connections");
+                return;
             }
-            else
+
+            if (socket.State != WebSocketState.Open)
             {
-                Console.WriteLine($"⚠️ [SocketConnectionService] Socket {socketId} not found or not open");
+                Console.WriteLine($"⚠️ [SocketConnectionService] Socket {socketId} is not open (state: {socket.State})");
+                return;
             }
+
+            var messageJson = JsonSerializer.Serialize(message);
+            var messageBuffer = Encoding.UTF8.GetBytes(messageJson);
+            await socket.SendAsync(new ArraySegment<byte>(messageBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
+            Console.WriteLine($"📤 [SocketConnectionService] Sent message to {socketId}: event={message.GetType().GetProperty("event")?.GetValue(message)?.ToString() ?? "unknown"}");
         }
         catch (Exception ex)
         {
@@ -1281,9 +1160,212 @@ public class SocketConnectionServiceImplement : ISocketConnectionService
         }
     }
 
-    /// <summary>
-    /// Connection metadata để tracking
-    /// </summary>
+    public async Task BroadcastToRoomAsync(string roomCode, string eventType, object data)
+    {
+        try
+        {
+            var socketIds = _socketToRoom
+                .Where(kv => kv.Value == roomCode)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            Console.WriteLine($"📡 [SocketConnectionService] Broadcasting '{eventType}' to room '{roomCode}'. Found {socketIds.Count} socket IDs: [{string.Join(", ", socketIds)}]");
+            if (!socketIds.Any())
+            {
+                Console.WriteLine($"⚠️ [SocketConnectionService] No active connections found for room '{roomCode}'");
+                return;
+            }
+
+            int successCount = 0;
+            int failCount = 0;
+
+            foreach (var socketId in socketIds)
+            {
+                try
+                {
+                    await SendMessageToSocketAsync(socketId, new
+                    {
+                        @event = eventType,
+                        data = data,
+                        timestamp = DateTime.UtcNow
+                    });
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    failCount++;
+                    Console.WriteLine($"❌ [SocketConnectionService] Failed to send '{eventType}' to socket '{socketId}': {ex.Message}");
+                }
+            }
+
+            Console.WriteLine($"📤 [SocketConnectionService] Broadcast '{eventType}' to room '{roomCode}' completed: {successCount} success, {failCount} failed out of {socketIds.Count} total");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error in BroadcastToRoomAsync for room '{roomCode}', event '{eventType}': {ex.Message}");
+        }
+    }
+
+    public async Task BroadcastToUserAsync(int userId, string eventType, object data)
+    {
+        try
+        {
+            var socketIds = _socketToUserId
+                .Where(kv => kv.Value == userId)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            Console.WriteLine($"📡 [SocketConnectionService] Broadcasting '{eventType}' to user {userId}. Found {socketIds.Count} socket connections");
+
+            foreach (var socketId in socketIds)
+            {
+                try
+                {
+                    await SendMessageToSocketAsync(socketId, new
+                    {
+                        @event = eventType,
+                        data = data,
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ [SocketConnectionService] Failed to send '{eventType}' to user {userId} socket '{socketId}': {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error in BroadcastToUserAsync for user {userId}, event '{eventType}': {ex.Message}");
+        }
+    }
+
+    public async Task BroadcastToSocketAsync(string socketId, string eventType, object data)
+    {
+        try
+        {
+            await SendMessageToSocketAsync(socketId, new
+            {
+                @event = eventType,
+                data = data,
+                timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error in BroadcastToSocketAsync for socket '{socketId}', event '{eventType}': {ex.Message}");
+        }
+    }
+
+    public async Task BroadcastToAllAsync(string eventType, object data)
+    {
+        try
+        {
+            var socketIds = _connections.Keys.ToList();
+            Console.WriteLine($"📡 [SocketConnectionService] Broadcasting '{eventType}' to all connections. Found {socketIds.Count} active connections");
+
+            foreach (var socketId in socketIds)
+            {
+                try
+                {
+                    await SendMessageToSocketAsync(socketId, new
+                    {
+                        @event = eventType,
+                        data = data,
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ [SocketConnectionService] Failed to send '{eventType}' to socket '{socketId}': {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error in BroadcastToAllAsync for event '{eventType}': {ex.Message}");
+        }
+    }
+
+    private async Task BroadcastGameStarted(string roomCode, object gameData)
+    {
+        try
+        {
+            Console.WriteLine($"📡 [SocketConnectionService] Broadcasting game-started for room '{roomCode}'");
+            await BroadcastToRoomAsync(roomCode, "game-started", gameData);
+            Console.WriteLine($"✅ [SocketConnectionService] Successfully broadcasted game-started for room '{roomCode}'");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Failed to broadcast game-started for room '{roomCode}': {ex.Message}");
+        }
+    }
+
+    private async Task CreateSocketConnectionInDatabase(string socketId, int userId, string roomCode)
+    {
+        try
+        {
+            Console.WriteLine($"💾 [SocketConnectionService] Creating SocketConnection in database: socketId={socketId}, userId={userId}, roomCode={roomCode}");
+            
+            if (_socketConnectionRepository == null)
+            {
+                Console.WriteLine($"⚠️ [SocketConnectionService] SocketConnectionRepository not available, skipping database save");
+                return;
+            }
+            
+            var now = DateTime.UtcNow;
+            var connection = new SocketConnection
+            {
+                SocketId = socketId,
+                UserId = userId,
+                RoomId = null,
+                ConnectedAt = now,
+                LastActivity = now
+            };
+
+            var connectionId = await _socketConnectionRepository.CreateAsync(connection);
+            if (connectionId > 0)
+            {
+                Console.WriteLine($"✅ [SocketConnectionService] Created SocketConnection with ID: {connectionId}");
+                
+                var updated = await _socketConnectionRepository.UpdateRoomIdAsync(socketId, roomCode);
+                if (updated)
+                {
+                    Console.WriteLine($"✅ [SocketConnectionService] Updated room_id for socket {socketId} to room {roomCode}");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ [SocketConnectionService] Failed to update room_id for socket {socketId}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"❌ [SocketConnectionService] Failed to create SocketConnection for socket {socketId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error creating SocketConnection: {ex.Message}");
+            Console.WriteLine($"❌ [SocketConnectionService] Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task UpdateLastActivity(string socketId)
+    {
+        try
+        {
+            if (_socketConnectionRepository != null)
+            {
+                await _socketConnectionRepository.UpdateLastActivityAsync(socketId);
+                Console.WriteLine($"🔄 [SocketConnectionService] Updated last activity for socket {socketId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionService] Error updating last activity for {socketId}: {ex.Message}");
+        }
+    }
+
     public class ConnectionMetadata
     {
         public string SocketId { get; set; } = "";

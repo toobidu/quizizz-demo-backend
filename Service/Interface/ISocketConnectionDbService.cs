@@ -7,6 +7,7 @@ public interface ISocketConnectionDbService
     Task<SocketConnectionDTO> GetBySocketIdAsync(string socketId);
     Task<IEnumerable<SocketConnectionDTO>> GetByRoomIdAsync(int roomId);
     Task<IEnumerable<SocketConnectionDTO>> GetByUserIdAsync(int userId);
+    Task<IEnumerable<SocketConnectionDTO>> GetByRoomCodeAsync(string roomCode);
     Task<int> CreateAsync(SocketConnection socketConnection);
     Task<bool> UpdateAsync(SocketConnection socketConnection);
     Task<bool> DeleteAsync(int id);

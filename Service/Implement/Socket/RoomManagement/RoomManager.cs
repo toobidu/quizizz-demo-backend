@@ -28,7 +28,13 @@ public class RoomManager
     {
         if (!_gameRooms.ContainsKey(roomCode))
         {
-            _gameRooms[roomCode] = new GameRoom { RoomCode = roomCode };
+            var newRoom = new GameRoom { RoomCode = roomCode };
+            _gameRooms[roomCode] = newRoom;
+            Console.WriteLine($"🏗️ [RoomManager] Created NEW room {roomCode}. Hash: {newRoom.GetHashCode()}. Total rooms: {_gameRooms.Count}");
+        }
+        else
+        {
+            Console.WriteLine($"♻️ [RoomManager] Retrieved EXISTING room {roomCode}. Hash: {_gameRooms[roomCode].GetHashCode()}. Players: {_gameRooms[roomCode].Players.Count}");
         }
         return _gameRooms[roomCode];
     }
@@ -56,6 +62,10 @@ public class RoomManager
         }
         // Lưu mapping socketId -> roomCode
         _socketToRoom[socketId] = roomCode;
+        
+        // ✅ THÊM LOGGING CHI TIẾT CHO JOIN-ROOM
+        Console.WriteLine($"🔗 [RoomManager] Mapped socketId '{socketId}' to room '{roomCode}'. Total mappings: {_socketToRoom.Count}");
+        Console.WriteLine($"🔍 [RoomManager] Current _socketToRoom mappings: [{string.Join(", ", _socketToRoom.Select(kv => $"{kv.Key}→{kv.Value}"))}]");
         // Kiểm tra player đã tồn tại
         var existingPlayer = gameRoom.Players.FirstOrDefault(p => p.UserId == userId);
         if (existingPlayer != null)
@@ -84,6 +94,12 @@ public class RoomManager
             JoinTime = DateTime.UtcNow
         };
         gameRoom.Players.Add(player);
+        
+        // ✅ THÊM DETAILED LOGGING CHO PLAYER ADDITION
+        Console.WriteLine($"✅ [RoomManager] Added player {username} (ID: {userId}) to room {roomCode}. Room now has {gameRoom.Players.Count} players");
+        Console.WriteLine($"🎮 [RoomManager] Players in room {roomCode}: [{string.Join(", ", gameRoom.Players.Select(p => $"{p.Username}({p.UserId})"))}]");
+        Console.WriteLine($"🎮 [RoomManager] Game room object hash: {gameRoom.GetHashCode()}");
+        
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         return (true, $"Chào mừng {username} đến phòng {roomCode}!", player);
     }
@@ -116,7 +132,11 @@ public class RoomManager
         };
         // Xóa player
         gameRoom.Players.Remove(player);
-        _socketToRoom.TryRemove(socketId, out _);
+        
+        // ✅ THÊM LOGGING CHI TIẾT CHO LEAVE-ROOM
+        bool removed = _socketToRoom.TryRemove(socketId, out var removedRoomCode);
+        Console.WriteLine($"🔗 [RoomManager] Removed socketId '{socketId}' from room '{removedRoomCode}'. Success: {removed}. Total mappings: {_socketToRoom.Count}");
+        
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         GamePlayer? newHost = null;
         // Xử lý chuyển host nếu cần
@@ -216,11 +236,14 @@ public class RoomManager
         return (true, "Player đã rời phòng", playerToRemove, newHost);
     }
     /// <summary>
-    /// Lấy room
+    /// Lấy room - sẽ tạo mới nếu chưa tồn tại
     /// </summary>
     public GameRoom? GetRoom(string roomCode)
     {
-        _gameRooms.TryGetValue(roomCode, out var room);
+        // ✅ SỬA: Sử dụng GetOrCreateRoom để đảm bảo room luôn tồn tại khi cần
+        Console.WriteLine($"🏠 [RoomManager] Getting room {roomCode}. Total rooms in memory: {_gameRooms.Count}");
+        var room = GetOrCreateRoom(roomCode);
+        Console.WriteLine($"🏠 [RoomManager] Room {roomCode} - Players: {room.Players.Count}");
         return room;
     }
     /// <summary>

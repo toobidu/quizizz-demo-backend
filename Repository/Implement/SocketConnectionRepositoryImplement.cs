@@ -114,6 +114,27 @@ public class SocketConnectionRepositoryImplement : ISocketConnectionRepository
         return await GetConnectionsByUserIdAsync(userId);
     }
     
+    public async Task<List<SocketConnection>> GetByRoomCodeAsync(string roomCode)
+    {
+        try
+        {
+            string sql = @"
+                SELECT sc.* 
+                FROM socket_connections sc
+                JOIN rooms r ON sc.room_id = r.id
+                WHERE r.room_code = @RoomCode";
+            
+            using var connection = _databaseHelper.GetConnection();
+            var result = await connection.QueryAsync<SocketConnection>(sql, new { RoomCode = roomCode });
+            return result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionRepository] Error getting connections by room code {roomCode}: {ex.Message}");
+            return new List<SocketConnection>();
+        }
+    }
+    
     public async Task<int> CreateAsync(SocketConnection socketConnection)
     {
         return await CreateConnectionAsync(socketConnection);
@@ -138,10 +159,37 @@ public class SocketConnectionRepositoryImplement : ISocketConnectionRepository
     {
         const string sql = @"
             UPDATE socket_connections
-            SET last_activity = CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh'
+            SET last_activity = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
             WHERE socket_id = @SocketId";
         using var connection = _databaseHelper.GetConnection();
         var rowsAffected = await connection.ExecuteAsync(sql, new { SocketId = socketId });
         return rowsAffected > 0;
+    }
+
+    // ✅ THÊM METHOD CẬP NHẬT ROOM_ID
+    public async Task<bool> UpdateRoomIdAsync(string socketId, string roomCode)
+    {
+        try
+        {
+            const string sql = @"
+                UPDATE socket_connections 
+                SET room_id = (SELECT id FROM rooms WHERE room_code = @RoomCode),
+                    last_activity = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
+                WHERE socket_id = @SocketId";
+            
+            using var connection = _databaseHelper.GetConnection();
+            var rowsAffected = await connection.ExecuteAsync(sql, new { 
+                SocketId = socketId, 
+                RoomCode = roomCode 
+            });
+            
+            Console.WriteLine($"✅ [SocketConnectionRepository] Updated room_id for socket {socketId} to room {roomCode}. Rows affected: {rowsAffected}");
+            return rowsAffected > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionRepository] Error updating room_id for socket {socketId}: {ex.Message}");
+            return false;
+        }
     }
 }

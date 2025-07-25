@@ -14,11 +14,15 @@ public interface ISocketConnectionRepository
     Task<bool> DeleteConnectionByIdAsync(int id);
     Task<bool> UpdateLastActivityAsync(string socketId);
     
+    // ✅ THÊM METHOD MỚI ĐỂ CẬP NHẬT ROOM_ID
+    Task<bool> UpdateRoomIdAsync(string socketId, string roomCode);
+    
     // Các phương thức tương thích cũ
     Task<SocketConnection?> GetByIdAsync(int id);
     Task<SocketConnection?> GetBySocketIdAsync(string socketId);
     Task<List<SocketConnection>> GetByRoomIdAsync(int roomId);
     Task<List<SocketConnection>> GetByUserIdAsync(int userId);
+    Task<List<SocketConnection>> GetByRoomCodeAsync(string roomCode);
     Task<int> CreateAsync(SocketConnection connection);
     Task<bool> UpdateAsync(SocketConnection connection);
     Task<bool> DeleteAsync(int id);

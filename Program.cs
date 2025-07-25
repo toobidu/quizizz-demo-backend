@@ -14,8 +14,6 @@ using ConsoleApp1.Repository.Interface;
 using ConsoleApp1.Model.DTO.Game;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using SocketConnectionService = ConsoleApp1.Service.Implement.Socket.SocketConnectionServiceImplement;
-
 internal class Program
 {
     private static async Task Main(string[] args)
@@ -87,20 +85,30 @@ internal class Program
         var webSocketConnections = new ConcurrentDictionary<string, WebSocket>();
         var socketToRoom = new ConcurrentDictionary<string, string>();
 
-        // Initialize WebSocket services
-        var socketConnectionSocketService = new SocketConnectionService(webSocketConnections, socketToRoom);
-        var roomManagementSocketService = new RoomManagementSocketServiceImplement(gameRooms, socketToRoom, webSocketConnections);
+        // Initialize WebSocket services - FIXED: Inject dependencies properly
+        var socketConnectionService = new SocketConnectionServiceImplement(
+            webSocketConnections, 
+            socketToRoom,
+            socketConnectionRepo  // ✅ THÊM REPOSITORY DEPENDENCY
+        );
+        var roomManagementSocketService = new RoomManagementSocketServiceImplement(
+            gameRooms, 
+            socketToRoom, 
+            webSocketConnections,
+            socketConnectionDbService,
+            roomRepo
+        );
         IGameFlowSocketService gameFlowSocketService = new GameFlowSocketServiceImplement(gameRooms, webSocketConnections);
         IPlayerInteractionSocketService playerInteractionSocketService = new PlayerInteractionSocketServiceImplement(gameRooms, webSocketConnections);
         IScoringSocketService scoringSocketService = new ScoringSocketServiceImplement(gameRooms, webSocketConnections);
         IHostControlSocketService hostControlSocketService = new HostControlSocketServiceImplement(gameRooms, webSocketConnections);
 
         // Set dependencies between services
-        socketConnectionSocketService.SetRoomManagementService(roomManagementSocketService);
+        socketConnectionService.SetRoomManagementService(roomManagementSocketService);
 
         // Initialize composite SocketService
         ISocketService socketService = new SocketServiceImplement(
-            socketConnectionSocketService,
+            socketConnectionService,
             roomManagementSocketService,
             gameFlowSocketService,
             playerInteractionSocketService,
@@ -135,9 +143,9 @@ internal class Program
         var gameController = new GameController(socketService, joinRoomService);
         var topicController = new TopicController(topicRepo);
         var questionController = new QuestionController(questionRepo, roomRepo, answerRepo);
-        var socketConnectionService = new ConsoleApp1.Service.Implement.SocketConnectionServiceImplement();
-        var gameSessionController = new GameSessionController(gameSessionRepo, gameQuestionRepo, roomRepo, socketConnectionService);
-        var socketConnectionController = new SocketConnectionController(socketConnectionRepo, userRepo, roomRepo, socketConnectionService);
+        
+        var gameSessionController = new GameSessionController(gameSessionRepo, gameQuestionRepo, roomRepo, (ConsoleApp1.Service.Interface.ISocketConnectionService)socketConnectionService);
+        var socketConnectionController = new SocketConnectionController(socketConnectionRepo, userRepo, roomRepo, (ConsoleApp1.Service.Interface.ISocketConnectionService)socketConnectionService);
 
         // Initialize Routers
         var authRouter = new AuthRouter(authController);
@@ -161,6 +169,28 @@ internal class Program
 
         // Start Socket.IO server
         await socketService.StartAsync(3001);
+
+        // ✅ THÊM GRACEFUL SHUTDOWN HANDLER
+        var cancellationTokenSource = new CancellationTokenSource();
+        
+        // Đăng ký xử lý Ctrl+C để shutdown gracefully
+        Console.CancelKeyPress += async (sender, e) =>
+        {
+            e.Cancel = true; // Ngăn ứng dụng thoát ngay lập tức
+            Console.WriteLine("\n🛑 Shutdown signal received. Gracefully shutting down...");
+            
+            try
+            {
+                // Dừng WebSocket server trước
+                await socketService.StopAsync();
+                
+                cancellationTokenSource.Cancel();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error during shutdown: {ex.Message}");
+            }
+        };
 
         // Register all routers to HttpServer
         var server = new HttpServer(
@@ -199,6 +229,18 @@ internal class Program
         Console.WriteLine("===========================================");
         Console.WriteLine();
 
-        await server.StartAsync();
+        try
+        {
+            // ✅ CHẠY HTTP SERVER
+            await server.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Server error: {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("🏁 Application terminated.");
+        }
     }
 }

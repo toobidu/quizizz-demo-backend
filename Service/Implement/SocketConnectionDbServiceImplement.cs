@@ -34,6 +34,20 @@ public class SocketConnectionDbServiceImplement : ISocketConnectionDbService
         var socketConnections = await _socketConnectionRepository.GetByUserIdAsync(userId);
         return socketConnections.Select(MapToDTO);
     }
+
+    public async Task<IEnumerable<SocketConnectionDTO>> GetByRoomCodeAsync(string roomCode)
+    {
+        try
+        {
+            var socketConnections = await _socketConnectionRepository.GetByRoomCodeAsync(roomCode);
+            return socketConnections.Select(MapToDTO);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [SocketConnectionDbService] Error getting connections by room code {roomCode}: {ex.Message}");
+            return new List<SocketConnectionDTO>();
+        }
+    }
     public async Task<int> CreateAsync(SocketConnection socketConnection)
     {
         return await _socketConnectionRepository.CreateAsync(socketConnection);

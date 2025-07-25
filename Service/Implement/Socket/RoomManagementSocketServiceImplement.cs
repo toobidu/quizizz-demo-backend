@@ -5,6 +5,9 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
 using ConsoleApp1.Config;
+using ConsoleApp1.Service.Interface;
+using ConsoleApp1.Repository.Interface;
+using ConsoleApp1.Model.Entity.Rooms;
 namespace ConsoleApp1.Service.Implement.Socket;
 /// <summary>
 /// Service quản lý phòng chơi qua WebSocket - Chịu trách nhiệm:
@@ -25,8 +28,31 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
     // Components
     private readonly RoomManager _roomManager;
     private readonly RoomEventBroadcaster _eventBroadcaster;
+    // Database services
+    private readonly ISocketConnectionDbService? _socketConnectionDbService;
+    private readonly IRoomRepository? _roomRepository;
+    
     /// <summary>
-    /// Constructor nhận shared dictionaries
+    /// Constructor nhận shared dictionaries và database services
+    /// </summary>
+    public RoomManagementSocketServiceImplement(
+        ConcurrentDictionary<string, GameRoom> gameRooms,
+        ConcurrentDictionary<string, string> socketToRoom,
+        ConcurrentDictionary<string, WebSocket> connections,
+        ISocketConnectionDbService socketConnectionDbService,
+        IRoomRepository roomRepository)
+    {
+        _gameRooms = gameRooms;
+        _socketToRoom = socketToRoom;
+        _connections = connections;
+        _socketConnectionDbService = socketConnectionDbService;
+        _roomRepository = roomRepository;
+        _roomManager = new RoomManager(_gameRooms, _socketToRoom, _connections);
+        _eventBroadcaster = new RoomEventBroadcaster(_gameRooms, _connections, socketConnectionDbService, socketToRoom);
+    }
+    
+    /// <summary>
+    /// Constructor fallback cho backward compatibility
     /// </summary>
     public RoomManagementSocketServiceImplement(
         ConcurrentDictionary<string, GameRoom> gameRooms,
@@ -36,6 +62,8 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
         _gameRooms = gameRooms;
         _socketToRoom = socketToRoom;
         _connections = connections;
+        _socketConnectionDbService = null;
+        _roomRepository = null;
         _roomManager = new RoomManager(_gameRooms, _socketToRoom, _connections);
         _eventBroadcaster = new RoomEventBroadcaster(_gameRooms, _connections);
     }
@@ -61,13 +89,35 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
     /// <param name="userId">ID người chơi trong database</param>
     public async Task JoinRoomAsync(string socketId, string roomCode, string username, int userId)
     {
+        bool success = false;
+        string message = "";
+        
         try
         {
+            // ✅ ENHANCED VALIDATION: Kiểm tra và xử lý username rỗng
+            username = string.IsNullOrWhiteSpace(username) ? $"User_{userId}" : username.Trim();
+            Console.WriteLine($"🎮 [RoomManagement] JoinRoomAsync: socketId='{socketId}', roomCode='{roomCode}', username='{username}', userId={userId}");
+
+            // ✅ VALIDATE USERID FORMAT
+            if (userId <= 0)
+            {
+                Console.WriteLine($"❌ [RoomManagement] Invalid userId: {userId}");
+                await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                    roomCode, 
+                    userId, 
+                    username, 
+                    success = false, 
+                    message = "UserId phải là số nguyên dương"
+                });
+                return;
+            }
+
             // Kiểm tra xem người chơi đã join gần đây chưa (trong vòng 2 giây)
             string cacheKey = $"join_{roomCode}_{userId}";
             if (_lastJoinTimes.TryGetValue(cacheKey, out var lastTime) && 
                 (DateTime.UtcNow - lastTime).TotalMilliseconds < 2000)
             {
+                Console.WriteLine($"⚠️ [RoomManagement] Rate limited join for user {userId} to room {roomCode}");
                 // Vẫn gửi thông tin phòng hiện tại cho client
                 var existingRoom = _roomManager.GetRoom(roomCode);
                 if (existingRoom != null)
@@ -89,29 +139,67 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                         host = existingRoom.Players.FirstOrDefault(p => p.IsHost)?.Username
                     };
                     await _eventBroadcaster.SendToPlayerAsync(socketId, RoomManagementConstants.Events.RoomPlayersUpdated, existingRoomData);
+                    
+                    // ✅ GỬI ACK CHO DUPLICATE REQUEST
+                    success = true;
+                    message = "Already joined (duplicate request ignored)";
+                    await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                        roomCode, 
+                        userId, 
+                        username, 
+                        success, 
+                        message,
+                        isHost = existingRoom.Players.FirstOrDefault(p => p.UserId == userId)?.IsHost ?? false
+                    });
                 }
                 return;
             }
             // Cập nhật thời gian join mới nhất
             _lastJoinTimes[cacheKey] = DateTime.UtcNow;
+            
             // Thêm player vào room
-            var (success, message, player) = _roomManager.AddPlayerToRoom(roomCode, socketId, username, userId);
-            if (!success)
+            var (joinSuccess, joinMessage, joinedPlayer) = _roomManager.AddPlayerToRoom(roomCode, socketId, username, userId);
+            if (!joinSuccess)
             {
+                // ✅ GỬI ACK CHO FAILED REQUEST
+                await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                    roomCode, 
+                    userId, 
+                    username, 
+                    success = false, 
+                    message = joinMessage
+                });
                 return;
             }
-            if (player == null)
+            if (joinedPlayer == null)
             {
+                // ✅ GỬI ACK CHO NULL PLAYER
+                await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                    roomCode, 
+                    userId, 
+                    username, 
+                    success = false, 
+                    message = "Failed to create player"
+                });
                 return;
             }
+
             // Lấy thông tin phòng để gửi thông tin về tất cả người chơi
             var room = _roomManager.GetRoom(roomCode);
             if (room == null)
             {
+                // ✅ GỬI ACK CHO ROOM NOT FOUND
+                await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                    roomCode, 
+                    userId, 
+                    username, 
+                    success = false, 
+                    message = "Room not found"
+                });
                 return;
             }
             // Gửi thông báo welcome cho player vừa join
-            await _eventBroadcaster.SendWelcomeMessageAsync(socketId, roomCode, player.IsHost, message);
+            await _eventBroadcaster.SendWelcomeMessageAsync(socketId, roomCode, joinedPlayer.IsHost, joinMessage);
             // Gửi thông tin về tất cả người chơi hiện có trong phòng cho người mới tham gia
             foreach (var existingPlayer in room.Players.Where(p => p.UserId != userId))
             {
@@ -152,9 +240,46 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
             // Gửi sự kiện room-players-updated đến tất cả người chơi trong phòng
             // Đảm bảo sự kiện này được gửi sau sự kiện player-joined
             await UpdateRoomPlayersAsync(roomCode);
+
+            // ✅ LƯU SOCKET CONNECTION VÀO DATABASE
+            Console.WriteLine($"💾 [RoomManagement] About to save socket connection to database: {socketId} -> {roomCode}");
+            await SaveSocketConnectionToDatabase(socketId, userId, roomCode);
+            Console.WriteLine($"💾 [RoomManagement] Completed saving socket connection to database for {socketId}");
+
+            // ✅ GỬI JOIN_ROOM_ACK THÀNH CÔNG
+            success = true;
+            message = "Joined room successfully";
+            await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                roomCode, 
+                userId, 
+                username, 
+                success, 
+                message,
+                isHost = joinedPlayer.IsHost,
+                totalPlayers = room.Players.Count
+            });
+            
+            Console.WriteLine($"✅ [RoomManagement] User {username} (ID: {userId}) successfully joined room {roomCode}");
         }
         catch (Exception ex)
         {
+            // ✅ GỬI ACK CHO EXCEPTION
+            Console.WriteLine($"❌ [RoomManagement] Error in JoinRoomAsync: {ex.Message}");
+            try 
+            {
+                await _eventBroadcaster.SendToPlayerAsync(socketId, "JOIN_ROOM_ACK", new { 
+                    roomCode, 
+                    userId, 
+                    username, 
+                    success = false, 
+                    message = $"Internal error: {ex.Message}"
+                });
+            }
+            catch 
+            {
+                // Log but don't throw - avoid cascade failures
+                Console.WriteLine($"❌ [RoomManagement] Failed to send error ACK to {socketId}");
+            }
         }
     }
     /// <summary>
@@ -274,6 +399,8 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
                 userId = newUserId,
                 username = username,
                 score = 0,
+                isHost = room.Players.FirstOrDefault(p => p.UserId == newUserId)?.IsHost ?? false,
+                status = room.Players.FirstOrDefault(p => p.UserId == newUserId)?.Status ?? "waiting",
                 timeTaken = "00:00:00",
                 roomCode = roomCode,
                 timestamp = DateTime.UtcNow
@@ -296,6 +423,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
             var otherPlayers = room.Players.Where(p => p.UserId != newUserId && !string.IsNullOrEmpty(p.SocketId)).ToList();
             
             Console.WriteLine($"🎯 [RoomManagement] Broadcasting player-joined to {otherPlayers.Count} other players in room {roomCode}");
+            Console.WriteLine($"🎯 [RoomManagement] Player joined data: {JsonSerializer.Serialize(playerJoinedData, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })}");
 
             var sendTasks = otherPlayers.Select(async player =>
             {
@@ -434,7 +562,7 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
         {
             var playerLeftData = new
             {
-                userId = userId,
+                userId = userId.ToString(),
                 username = username
             };
             // Broadcast tới tất cả người chơi trong phòng
@@ -496,13 +624,131 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
         }
     }
     /// <summary>
-    /// Lấy thông tin phòng theo mã phòng
+    /// Lấy thông tin phòng theo mã phòng với database fallback
     /// </summary>
     /// <param name="roomCode">Mã phòng cần lấy thông tin</param>
     /// <returns>Thông tin phòng hoặc null nếu không tìm thấy</returns>
-    public Task<GameRoom?> GetRoomAsync(string roomCode)
+    public async Task<GameRoom?> GetRoomAsync(string roomCode)
     {
         var room = _roomManager.GetRoom(roomCode);
-        return Task.FromResult(room);
+        if (room == null)
+        {
+            Console.WriteLine($"🏠 [RoomManagement] Room {roomCode} not found in memory, trying database...");
+            
+            try
+            {
+                if (_roomRepository != null)
+                {
+                    var dbRoom = await _roomRepository.GetRoomByCodeAsync(roomCode);
+                    if (dbRoom != null)
+                    {
+                        Console.WriteLine($"🏠 [RoomManagement] Room {roomCode} found in database");
+                        
+                        // TODO: Có thể load players từ database và tạo GameRoom object tương ứng
+                        // Hiện tại chỉ log thông tin tìm thấy
+                        
+                        return null; // Vì chưa implement đầy đủ conversion từ DB Room sang GameRoom
+                    }
+                    else
+                    {
+                        Console.WriteLine($"🏠 [RoomManagement] Room {roomCode} not found in database");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"🏠 [RoomManagement] Room repository not available for database lookup");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [RoomManagement] Error looking up room {roomCode} in database: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"🏠 [RoomManagement] Room {roomCode} found in memory with {room.Players.Count} players");
+        }
+        
+        return room;
+    }
+
+    /// <summary>
+    /// Lưu thông tin SocketConnection vào database
+    /// </summary>
+    /// <param name="socketId">Socket ID</param>
+    /// <param name="userId">User ID</param>
+    /// <param name="roomCode">Room Code</param>
+    private async Task SaveSocketConnectionToDatabase(string socketId, int userId, string roomCode)
+    {
+        try
+        {
+            if (_socketConnectionDbService == null || _roomRepository == null)
+            {
+                Console.WriteLine($"⚠️ [RoomManagement] Database services not available, skipping socket connection save for {socketId}");
+                return;
+            }
+
+            // ✅ LẤY ROOMID TỪ DATABASE VÀ KIỂM TRA KỸ LƯỠNG
+            var dbRoom = await _roomRepository.GetRoomByCodeAsync(roomCode);
+            if (dbRoom != null && dbRoom.Id > 0)
+            {
+                var now = DateTime.UtcNow;
+                
+                // ✅ KIỂM TRA XEM SOCKET CONNECTION ĐÃ TỒN TẠI CHƯA
+                var existingConnectionDto = await _socketConnectionDbService.GetBySocketIdAsync(socketId);
+                
+                if (existingConnectionDto != null)
+                {
+                    // ✅ TẠO ENTITY MỚI ĐỂ CẬP NHẬT VỚI ROOM_ID VÀ TIMESTAMP ĐÚNG
+                    var socketConnectionToUpdate = new SocketConnection
+                    {
+                        Id = existingConnectionDto.Id,
+                        SocketId = socketId,
+                        UserId = userId,
+                        RoomId = dbRoom.Id,
+                        ConnectedAt = existingConnectionDto.ConnectedAt,
+                        LastActivity = now
+                    };
+                    
+                    await _socketConnectionDbService.UpdateAsync(socketConnectionToUpdate);
+                    Console.WriteLine($"✅ [RoomManagement] Updated existing SocketConnection: {socketId} -> Room {roomCode} (ID: {dbRoom.Id})");
+                }
+                else
+                {
+                    // ✅ TẠO MỚI VỚI CÁC TIMESTAMP CHÍNH XÁC
+                    var socketConnection = new SocketConnection
+                    {
+                        SocketId = socketId,
+                        UserId = userId,
+                        RoomId = dbRoom.Id,
+                        ConnectedAt = now,
+                        LastActivity = now
+                    };
+
+                    await _socketConnectionDbService.CreateAsync(socketConnection);
+                    Console.WriteLine($"✅ [RoomManagement] Created new SocketConnection: {socketId} -> Room {roomCode} (ID: {dbRoom.Id})");
+                }
+                
+                // ✅ VERIFY LẠI DATABASE RECORD SAU KHI LƯU
+                var verifyConnection = await _socketConnectionDbService.GetBySocketIdAsync(socketId);
+                if (verifyConnection != null && verifyConnection.RoomId.HasValue)
+                {
+                    Console.WriteLine($"✅ [RoomManagement] Verified SocketConnection in database: RoomId={verifyConnection.RoomId}, ConnectedAt={verifyConnection.ConnectedAt}, LastActivity={verifyConnection.LastActivity}");
+                }
+                else
+                {
+                    Console.WriteLine($"❌ [RoomManagement] Failed to verify SocketConnection in database for {socketId}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ [RoomManagement] Room {roomCode} not found in database or invalid ID, cannot save socket connection");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [RoomManagement] Failed to save SocketConnection to database: {ex.Message}");
+            Console.WriteLine($"❌ [RoomManagement] Stack trace: {ex.StackTrace}");
+        }
     }
 }

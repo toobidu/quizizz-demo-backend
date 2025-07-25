@@ -115,31 +115,26 @@ public class GameEventBroadcaster
         var buffer = Encoding.UTF8.GetBytes(message);
         
         int sentCount = 0;
-        var sendTasks = gameRoom.Players
-            .Where(p => !string.IsNullOrEmpty(p.SocketId))
-            .Select(async player =>
+        foreach (var player in gameRoom.Players.Where(p => !string.IsNullOrEmpty(p.SocketId)))
+        {
+            if (_connections.TryGetValue(player.SocketId!, out var socket) && socket.State == WebSocketState.Open)
             {
-                if (_connections.TryGetValue(player.SocketId!, out var socket) &&
-                    socket.State == WebSocketState.Open)
+                try
                 {
-                    try
-                    {
-                        await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-                        Interlocked.Increment(ref sentCount);
-                        Console.WriteLine($"✅ [GameEventBroadcaster] Sent {eventName} to player {player.Username} (socketId: {player.SocketId})");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"❌ [GameEventBroadcaster] Failed to send {eventName} to player {player.Username}: {ex.Message}");
-                    }
+                    await socket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+                    sentCount++;
+                    Console.WriteLine($"✅ [GameEventBroadcaster] Sent {eventName} to player {player.Username} (socketId: {player.SocketId})");
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"⚠️ [GameEventBroadcaster] Player {player.Username} has invalid socket connection");
+                    Console.WriteLine($"❌ [GameEventBroadcaster] Failed to send {eventName} to player {player.Username}: {ex.Message}");
                 }
-            });
-        await Task.WhenAll(sendTasks);
-        
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ [GameEventBroadcaster] Player {player.Username} has invalid socket connection");
+            }
+        }
         Console.WriteLine($"📡 [GameEventBroadcaster] Broadcast {eventName} completed: {sentCount}/{gameRoom.Players.Count} players notified");
     }
     /// <summary>
