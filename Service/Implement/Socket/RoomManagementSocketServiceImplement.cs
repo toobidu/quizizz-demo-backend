@@ -336,6 +336,16 @@ public class RoomManagementSocketServiceImplement : IRoomManagementSocketService
         catch (Exception ex)
         {
         }
+        finally
+        {
+            // Sau khi xử lý, kiểm tra nếu phòng không còn ai thì xóa khỏi _gameRooms
+            var room = _roomManager.GetRoom(roomCode);
+            if (room != null && room.Players.Count == 0)
+            {
+                _gameRooms.TryRemove(roomCode, out _);
+                Console.WriteLine($"🗑️ [RoomManagement] Room {roomCode} đã bị xóa vì không còn người chơi nào.");
+            }
+        }
     }
     // Dictionary để theo dõi thời gian gửi sự kiện cuối cùng cho mỗi phòng
     private readonly ConcurrentDictionary<string, DateTime> _lastUpdateTimes = new();
